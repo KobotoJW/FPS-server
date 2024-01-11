@@ -2,9 +2,30 @@
 #include <cstring>
 #include <unistd.h>
 #include <arpa/inet.h>
+#include <thread>
 
 const char* SERVER_IP = "127.0.0.1";
 const int PORT = 12345;
+
+void sendToServer(int clientSocket, const char* message) {
+    send(clientSocket, message, strlen(message), 0);
+}
+
+void startCommandThread(int clientSocket) {
+    std::thread commandThread([clientSocket]() {
+        std::string input;
+        while (true) {
+            std::getline(std::cin, input);
+            if (input == "/say"){
+                std::string message;
+                std::cout << "Enter message: ";
+                std::getline(std::cin, message);
+                sendToServer(clientSocket, message.c_str());
+            }
+        }
+    });
+    commandThread.detach();
+}
 
 int main() {
     int clientSocket = socket(AF_INET, SOCK_STREAM, 0);
@@ -26,19 +47,10 @@ int main() {
 
     std::cout << "Connected to server" << std::endl;
 
-    char buffer[1024];
+    startCommandThread(clientSocket);
+
     while (true) {
-        // Get user input or implement your own game logic
-        std::cout << "Enter a message (or 'exit' to quit): ";
-        std::cin.getline(buffer, sizeof(buffer));
-
-        if (strcmp(buffer, "exit") == 0) {
-            break;
-        }
-
-        // Send user input to the server
-        send(clientSocket, buffer, strlen(buffer), 0);
-
+        char buffer[1024];
         // Receive and display the server's response
         int bytesRead = recv(clientSocket, buffer, sizeof(buffer), 0);
         if (bytesRead <= 0) {
@@ -47,7 +59,7 @@ int main() {
         }
 
         buffer[bytesRead] = '\0';
-        std::cout << "Server response: " << buffer << std::endl;
+        std::cout << "Server: " << buffer << std::endl;
     }
 
     // Close the client socket

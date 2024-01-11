@@ -17,7 +17,6 @@ struct Client {
     std::string name;
     Room* room;
     bool disconnected = false;
-    
 };
 
 struct Room {
@@ -26,42 +25,52 @@ struct Room {
 
     Room() {}
     Room(const std::string& roomName) : name(roomName) {}
-    
+
     void removeClient(Client* client) {
         clients.erase(std::remove(clients.begin(), clients.end(), client), clients.end());
     }
-};
 
-struct RoomComparator {
-    bool operator()(const Room& r) const {
-        return r.clients.empty();
+    void informClients() {
+        for (auto& client : clients) {
+            std::string message = "In this room: ";
+            for (auto& otherClient : clients) {
+                if (otherClient != client) {
+                    message += otherClient->name + ", ";
+                }
+            }
+            message = message.substr(0, message.size() - 2); // Remove trailing comma
+            send(client->socket, message.c_str(), message.size(), 0);
+        }
     }
 };
 
 std::vector<Room> rooms;
 std::mutex roomsMutex;
 
+// Forward declarations
+void printStatus();
+void cleanupEmptyRooms();
+void handleClientDisconnect(Client* client);
+void handleClient(Client* client, fd_set* masterSet);
+void startServer(int PORT, int MAX_CLIENTS);
+
+// Function to print the server status
 void printStatus() {
-    std::string input;
-    while (true) {
-        std::getline(std::cin, input);
-        if (input == "status") {
-            std::lock_guard<std::mutex> lock(roomsMutex);
-            std::cout << "Rooms: " << rooms.size() << std::endl;
-            for (const auto& room : rooms) {
-                std::cout << "-Room " << room.name << ": " << room.clients.size() << " clients" << std::endl;
-                for (const auto& client : room.clients) {
-                    std::cout << "--Client: " << client->name << std::endl;
-                }
-            }
+    std::lock_guard<std::mutex> lock(roomsMutex);
+    std::cout << "Rooms: " << rooms.size() << std::endl;
+    for (const auto& room : rooms) {
+        std::cout << "-Room " << room.name << ": " << room.clients.size() << " clients" << std::endl;
+        for (const auto& client : room.clients) {
+            std::cout << "--Client: " << client->name << std::endl;
         }
     }
 }
 
+// Function to clean up empty rooms
 void cleanupEmptyRooms() {
     std::thread([]() {
         std::lock_guard<std::mutex> lock(roomsMutex);
-        for (auto it = rooms.begin(); it != rooms.end(); ) {
+        for (auto it = rooms.begin(); it != rooms.end();) {
             if (it->clients.empty() && it->name != "Room 1") {
                 std::cout << "Room " << it->name << " is now empty, removing it" << std::endl;
                 it = rooms.erase(it);
@@ -72,34 +81,38 @@ void cleanupEmptyRooms() {
     }).detach();
 }
 
-void handleClientDisconnect(Client** client) {
-    if (!*client || !client) {
+// Function to handle client disconnection
+void handleClientDisconnect(Client* client) {
+    if (!client || client->disconnected) {
         return;
     }
+
     // Make a copy of the room pointer
-    Room* room = (*client)->room;
+    Room* room = client->room;
 
     // Remove the client from the room
     if (room) {
-        room->removeClient(*client);
+        room->removeClient(client);
     }
 
     // Close the client's socket
-    close((*client)->socket);
-    delete *client;
-    *client = nullptr;
+    close(client->socket);
+    client->disconnected = true;
 
     // Cleanup empty rooms
     cleanupEmptyRooms();
 }
 
-void handleClient(Client** client, fd_set* masterSet) {
-    if (!*client || !client) {
+// Function to handle client communication
+void handleClient(Client* client, fd_set* masterSet) {
+    if (!client || client->disconnected) {
         return;
     }
+
     char buffer[1024];
     int bytesRead;
-    if ((bytesRead = recv((*client)->socket, buffer, sizeof(buffer), 0)) > 0) {
+
+    if ((bytesRead = recv(client->socket, buffer, sizeof(buffer), 0)) > 0) {
         // Process received data
         buffer[bytesRead] = '\0';
         std::cout << "Received: " << buffer << std::endl;
@@ -107,19 +120,18 @@ void handleClient(Client** client, fd_set* masterSet) {
         // Implement your game logic here
 
         // Example: Send a response back to the client
-        send((*client)->socket, "Server: Message received", strlen("Server: Message received"), 0);
+        send(client->socket, "Server: Message received", strlen("Server: Message received"), 0);
     } else {
         // Client disconnected
         std::cout << "Client disconnected" << std::endl;
-        (*client)->disconnected = true;
-        int clientSocket = (*client)->socket;
         handleClientDisconnect(client);
-        FD_CLR(clientSocket, masterSet);
+        FD_CLR(client->socket, masterSet);
     }
 }
 
 int roomCount = 1;
 
+// Function to start the server
 void startServer(int PORT, int MAX_CLIENTS) {
     int serverSocket = socket(AF_INET, SOCK_STREAM, 0);
     sockaddr_in serverAddress;
@@ -202,8 +214,8 @@ void startServer(int PORT, int MAX_CLIENTS) {
                         for (auto& room : rooms) {
                             for (auto& client : room.clients) {
                                 if (client && client->socket == i) {
-                                    handleClient(&client, &masterSet);
-                                    if (client == nullptr) {
+                                    handleClient(client, &masterSet);
+                                    if (client->disconnected) {
                                         roomsToClean.push_back(&room);
                                     }
                                     break;
@@ -213,7 +225,7 @@ void startServer(int PORT, int MAX_CLIENTS) {
                     }
                     for (auto& room : roomsToClean) {
                         room->clients.erase(std::remove_if(room->clients.begin(), room->clients.end(),
-                            [](const Client* client) { return client == nullptr; }), room->clients.end());
+                            [](const Client* client) { return client->disconnected; }), room->clients.end());
                     }
                 }
             }
@@ -221,6 +233,41 @@ void startServer(int PORT, int MAX_CLIENTS) {
     }
 }
 
+void broadcastToRoom(Room* room, const std::string& message) {
+    for (auto& client : room->clients) {
+        send(client->socket, message.c_str(), message.size(), 0);
+    }
+}
+
+void startCommandThread() {
+    std::thread commandThread([]() {
+        std::string input;
+        while (true) {
+            std::getline(std::cin, input);
+            if (input == "status") {
+                printStatus();
+            }
+            
+            if (input == "/say"){
+                std::string message;
+                std::cout << "Enter message: ";
+                std::getline(std::cin, message);
+                std::cout << "Enter room: ";
+                std::getline(std::cin, input);
+                std::lock_guard<std::mutex> lock(roomsMutex);
+                for (auto& room : rooms) {
+                    if (room.name == input) {
+                        broadcastToRoom(&room, message);
+                        break;
+                    }
+                }
+            }
+        }
+    });
+    commandThread.detach();
+}
+
+// Main function
 int main(int argc, char** argv) {
     if (argc < 3) {
         std::cerr << "Usage: " << argv[0] << " <port> <max_clients>" << std::endl;
@@ -229,8 +276,7 @@ int main(int argc, char** argv) {
     PORT = std::stoi(argv[1]);
     MAX_CLIENTS = std::stoi(argv[2]);
 
-    std::thread statusThread(printStatus);
+    startCommandThread();
     startServer(PORT, MAX_CLIENTS);
-    statusThread.join();
     return 0;
 }
