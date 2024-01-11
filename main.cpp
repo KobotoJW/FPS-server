@@ -7,8 +7,8 @@
 #include <algorithm>
 #include <mutex>
 
-const int PORT = 12345;
-const int MAX_CLIENTS = 2;
+int PORT;
+int MAX_CLIENTS;
 
 struct Room;
 
@@ -108,9 +108,21 @@ void handleClient(Client** client, fd_set* masterSet) {
     }
 }
 
-void startServer() {
+void startServer(int PORT, int MAX_CLIENTS) {
     int serverSocket = socket(AF_INET, SOCK_STREAM, 0);
     sockaddr_in serverAddress;
+
+    if (serverSocket == -1) {
+        std::cerr << "Error creating socket" << std::endl;
+        exit(EXIT_FAILURE);
+    }
+
+    int opt = 1;
+    if (setsockopt(serverSocket, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) == -1) {
+        std::cerr << "Error setting socket options" << std::endl;
+        exit(EXIT_FAILURE);
+    }
+
     serverAddress.sin_family = AF_INET;
     serverAddress.sin_port = htons(PORT);
     serverAddress.sin_addr.s_addr = INADDR_ANY;
@@ -195,9 +207,16 @@ void startServer() {
     }
 }
 
-int main() {
+int main(int argc, char** argv) {
+    if (argc < 3) {
+        std::cerr << "Usage: " << argv[0] << " <port> <max_clients>" << std::endl;
+        return 1;
+    }
+    PORT = std::stoi(argv[1]);
+    MAX_CLIENTS = std::stoi(argv[2]);
+
     std::thread statusThread(printStatus);
-    startServer();
+    startServer(PORT, MAX_CLIENTS);
     statusThread.join();
     return 0;
 }
