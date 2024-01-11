@@ -58,6 +58,20 @@ void printStatus() {
     }
 }
 
+void cleanupEmptyRooms() {
+    std::thread([]() {
+        std::lock_guard<std::mutex> lock(roomsMutex);
+        for (auto it = rooms.begin(); it != rooms.end(); ) {
+            if (it->clients.empty() && it->name != "Room 1") {
+                std::cout << "Room " << it->name << " is now empty, removing it" << std::endl;
+                it = rooms.erase(it);
+            } else {
+                ++it;
+            }
+        }
+    }).detach();
+}
+
 void handleClientDisconnect(Client** client) {
     if (!*client || !client) {
         return;
@@ -75,12 +89,8 @@ void handleClientDisconnect(Client** client) {
     delete *client;
     *client = nullptr;
 
-    // If the room is now empty, you could also remove it but 1 room must always exist
-    if (room && room->clients.empty() && room->name != "Room1") {
-        std::cout << "Room " << room->name << " is now empty, removing it" << std::endl;
-        rooms.erase(std::remove_if(rooms.begin(), rooms.end(),
-        [&room](const Room& r) { return &r == room; }), rooms.end());
-    }
+    // Cleanup empty rooms
+    cleanupEmptyRooms();
 }
 
 void handleClient(Client** client, fd_set* masterSet) {
@@ -184,15 +194,17 @@ void startServer(int PORT, int MAX_CLIENTS) {
                     std::cout << "Client connected: " << room->clients.back()->name << " to room: " << room->name << std::endl;
                 } else {
                     std::vector<Room*> roomsToClean;
-                    roomsMutex.lock();
-                    for (auto& room : rooms) {
-                        for (auto& client : room.clients) {
-                            if (client && client->socket == i) {
-                                handleClient(&client, &masterSet);
-                                if (client == nullptr) {
-                                    roomsToClean.push_back(&room);
+                    {
+                        std::lock_guard<std::mutex> lock(roomsMutex);
+                        for (auto& room : rooms) {
+                            for (auto& client : room.clients) {
+                                if (client && client->socket == i) {
+                                    handleClient(&client, &masterSet);
+                                    if (client == nullptr) {
+                                        roomsToClean.push_back(&room);
+                                    }
+                                    break;
                                 }
-                                break;
                             }
                         }
                     }
@@ -203,7 +215,6 @@ void startServer(int PORT, int MAX_CLIENTS) {
                 }
             }
         }
-        roomsMutex.unlock();
     }
 }
 
