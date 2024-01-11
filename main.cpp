@@ -1,66 +1,203 @@
 #include <iostream>
+#include <vector>
 #include <cstring>
+#include <unistd.h>
+#include <arpa/inet.h>
 #include <thread>
-#include <enet/enet.h>
+#include <algorithm>
+#include <mutex>
 
-void sendPacket(ENetPeer * peer, char * message)
-{
-    ENetPacket * packet = enet_packet_create(message, strlen(message) + 1, ENET_PACKET_FLAG_RELIABLE);
-    enet_peer_send(peer, 0, packet); //(where, channel, packet)
-    enet_host_flush(peer->host);
-}
+const int PORT = 12345;
+const int MAX_CLIENTS = 2;
 
-int main(int argc, char ** argv)
-{
-    if(enet_initialize() != 0)
-    {
-        std::cerr << "An error occurred while initializing ENet." << std::endl;
-        return EXIT_FAILURE;
+struct Room;
+
+struct Client {
+    int socket;
+    std::string name;
+    Room* room;
+    bool disconnected = false;
+    
+};
+
+struct Room {
+    std::string name;
+    std::vector<Client*> clients;
+
+    Room(const std::string& roomName = "Room1") : name(roomName) {}
+    
+    void removeClient(Client* client) {
+        clients.erase(std::remove(clients.begin(), clients.end(), client), clients.end());
     }
-    atexit(enet_deinitialize);
+};
 
-    ENetAddress address;
-    ENetEvent event;
-
-    address.host = ENET_HOST_ANY;
-    address.port = 2115;
-
-    ENetHost * server;
-
-    server = enet_host_create(&address, 32, 1, 0, 0);
-
-    if (server == NULL)
-    {
-        std::cerr << "An error occurred while trying to create an ENet server host." << std::endl;
-        return EXIT_FAILURE;
+struct RoomComparator {
+    bool operator()(const Room& r) const {
+        return r.clients.empty();
     }
+};
 
-    //game loop
-    char message[256] = "Welcome to the server!";
+std::vector<Room> rooms;
+std::mutex roomsMutex;
 
-    while (true)
-    {
-        while (enet_host_service(server, &event, 1000) > 0)
-        {
-            switch (event.type)
-            {
-            case ENET_EVENT_TYPE_CONNECT:
-                std::cout << "A new client connected from " << event.peer->address.host << ":" << event.peer->address.port << "." << std::endl;
-                sendPacket(event.peer, message);
-                break;
-            case ENET_EVENT_TYPE_RECEIVE:
-                std::cout << "A packet of length " << event.packet->dataLength << " containing message: " << event.packet->data << " was received from " << event.peer->address.host << ":" << event.peer->address.port << " on channel " << event.channelID << "." << std::endl;
-                enet_packet_destroy(event.packet);
-                break;
-            case ENET_EVENT_TYPE_DISCONNECT:
-                std::cout << event.peer->address.host << ":" << event.peer->address.port << " disconnected." << std::endl;
-                event.peer->data = NULL;
-                break;
+void printStatus() {
+    std::string input;
+    while (true) {
+        std::getline(std::cin, input);
+        if (input == "status") {
+            roomsMutex.lock();
+            std::cout << "Rooms: " << rooms.size() << std::endl;
+            for (int i = 0; i < rooms.size(); i++) {
+                std::cout << "-Room " << i + 1 << ": " << rooms[i].clients.size() << " clients" << std::endl;
+                for (const auto& client : rooms[i].clients) {
+                    std::cout << "--Client: " << client->name << std::endl;
+                }
             }
+            roomsMutex.unlock();
         }
     }
-    //game loop end
-    
-    enet_host_destroy(server);
-    return EXIT_SUCCESS;
+}
+
+void handleClientDisconnect(Client** client) {
+    if (!*client || !client) {
+        return;
+    }
+    // Make a copy of the room pointer
+    Room* room = (*client)->room;
+
+    // Remove the client from the room
+    if (room) {
+        room->removeClient(*client);
+    }
+
+    // Close the client's socket
+    close((*client)->socket);
+    delete *client;
+    *client = nullptr;
+
+    // If the room is now empty, you could also remove it but 1 room must always exist
+    if (room && room->clients.empty() && room->name != "Room1") {
+        std::cout << "Room " << room->name << " is now empty, removing it" << std::endl;
+        rooms.erase(std::remove_if(rooms.begin(), rooms.end(),
+        [&room](const Room& r) { return &r == room; }), rooms.end());
+    }
+}
+
+void handleClient(Client** client, fd_set* masterSet) {
+    if (!*client || !client) {
+        return;
+    }
+    char buffer[1024];
+    int bytesRead;
+    if ((bytesRead = recv((*client)->socket, buffer, sizeof(buffer), 0)) > 0) {
+        // Process received data
+        buffer[bytesRead] = '\0';
+        std::cout << "Received: " << buffer << std::endl;
+
+        // Implement your game logic here
+
+        // Example: Send a response back to the client
+        send((*client)->socket, "Server: Message received", strlen("Server: Message received"), 0);
+    } else {
+        // Client disconnected
+        std::cout << "Client disconnected" << std::endl;
+        (*client)->disconnected = true;
+        int clientSocket = (*client)->socket;
+        handleClientDisconnect(client);
+        FD_CLR(clientSocket, masterSet);
+    }
+}
+
+void startServer() {
+    int serverSocket = socket(AF_INET, SOCK_STREAM, 0);
+    sockaddr_in serverAddress;
+    serverAddress.sin_family = AF_INET;
+    serverAddress.sin_port = htons(PORT);
+    serverAddress.sin_addr.s_addr = INADDR_ANY;
+
+    bind(serverSocket, (struct sockaddr*)&serverAddress, sizeof(serverAddress));
+    listen(serverSocket, MAX_CLIENTS);
+
+    fd_set masterSet;
+    FD_ZERO(&masterSet);
+    FD_SET(serverSocket, &masterSet);
+    int maxSocket = serverSocket;
+
+    while (true) {
+        fd_set copySet = masterSet;
+
+        if (select(maxSocket + 1, &copySet, nullptr, nullptr, nullptr) == -1) {
+            perror("select");
+            exit(4);
+        }
+
+        for (int i = 0; i <= maxSocket; i++) {
+            if (FD_ISSET(i, &copySet)) {
+                if (i == serverSocket) {
+                    // New connection
+                    sockaddr_in clientAddress;
+                    socklen_t clientSize = sizeof(clientAddress);
+                    int clientSocket = accept(serverSocket, (struct sockaddr*)&clientAddress, &clientSize);
+
+                    if (clientSocket == -1) {
+                        std::cerr << "Error accepting connection" << std::endl;
+                        continue;
+                    }
+
+                    FD_SET(clientSocket, &masterSet);
+                    if (clientSocket > maxSocket) {
+                        maxSocket = clientSocket;
+                    }
+
+                    // Add the client to a room
+                    if (rooms.empty()) {
+                        rooms.emplace_back();
+                    }
+
+                    Room* room = nullptr;
+                    for (auto& r : rooms) {
+                        if (r.clients.size() < MAX_CLIENTS) {
+                            room = &r;
+                            break;
+                        }
+                    }
+
+                    if (!room) {
+                        // All rooms are full, create a new one
+                        rooms.push_back(Room("Room" + std::to_string(rooms.size() + 1)));
+                        room = &rooms.back();
+                    }
+
+                    room->clients.emplace_back(new Client{clientSocket, "Player" + std::to_string(room->clients.size() + 1)});
+                    std::cout << "Client connected: " << room->clients.back()->name << " to room: " << room->name << std::endl;
+                } else {
+                    std::vector<Room*> roomsToClean;
+                    roomsMutex.lock();
+                    for (auto& room : rooms) {
+                        for (auto& client : room.clients) {
+                            if (client && client->socket == i) {
+                                handleClient(&client, &masterSet);
+                                if (client == nullptr) {
+                                    roomsToClean.push_back(&room);
+                                }
+                                break;
+                            }
+                        }
+                    }
+                    for (auto& room : roomsToClean) {
+                        room->clients.erase(std::remove_if(room->clients.begin(), room->clients.end(),
+                            [](const Client* client) { return client == nullptr; }), room->clients.end());
+                    }
+                }
+            }
+        }
+        roomsMutex.unlock();
+    }
+}
+
+int main() {
+    std::thread statusThread(printStatus);
+    startServer();
+    statusThread.join();
+    return 0;
 }

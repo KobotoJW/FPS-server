@@ -1,111 +1,57 @@
 #include <iostream>
 #include <cstring>
-#include <enet/enet.h>
-#include <thread>
+#include <unistd.h>
+#include <arpa/inet.h>
 
-char* getUsername()
-{
-    char* username = new char[32];
-    std::cout << "Enter username: ";
-    fgets(username, 32, stdin);
-    return username;
-}
+const char* SERVER_IP = "127.0.0.1";
+const int PORT = 12345;
 
-void sendPacket(ENetPeer * peer, char * message)
-{
-    ENetPacket * packet = enet_packet_create(message, strlen(message)+1, ENET_PACKET_FLAG_RELIABLE);
-    enet_peer_send(peer, 0, packet); //(where, channel, packet)
-    enet_host_flush(peer->host);
-}
+int main() {
+    int clientSocket = socket(AF_INET, SOCK_STREAM, 0);
+    if (clientSocket == -1) {
+        std::cerr << "Error creating socket" << std::endl;
+        return 1;
+    }
 
-void * RecieveLoop(ENetHost * client)
-{
-    while (true)
-    {
-        ENetEvent event;
-        while (enet_host_service(client, &event, 0) > 0)
-        {
-            switch (event.type)
-            {
-            case ENET_EVENT_TYPE_RECEIVE:
-                std::cout << "A packet of length " << event.packet->dataLength << " containing message: " << event.packet->data << " was received from " << event.peer->address.host << ":" << event.peer->address.port << " on channel " << event.channelID << "." << std::endl;
-                enet_packet_destroy(event.packet);
-                break;
-            case ENET_EVENT_TYPE_DISCONNECT:
-                std::cout << "Disconnection succeeded." << std::endl;
-                break;
-            }
+    sockaddr_in serverAddr{};
+    serverAddr.sin_family = AF_INET;
+    serverAddr.sin_port = htons(PORT);
+    inet_pton(AF_INET, SERVER_IP, &serverAddr.sin_addr);
+
+    if (connect(clientSocket, (struct sockaddr*)&serverAddr, sizeof(serverAddr)) == -1) {
+        std::cerr << "Error connecting to server" << std::endl;
+        close(clientSocket);
+        return 1;
+    }
+
+    std::cout << "Connected to server" << std::endl;
+
+    char buffer[1024];
+    while (true) {
+        // Get user input or implement your own game logic
+        std::cout << "Enter a message (or 'exit' to quit): ";
+        std::cin.getline(buffer, sizeof(buffer));
+
+        if (strcmp(buffer, "exit") == 0) {
+            break;
         }
-    }
-    
-}
 
-void *  sendLoop(ENetPeer * peer)
-{
-    char message[256];
-    while (true)
-    {
-        std::cout << "Enter message: ";
-        fgets(message, sizeof(message), stdin);
-        sendPacket(peer, message);
-    }
-}
+        // Send user input to the server
+        send(clientSocket, buffer, strlen(buffer), 0);
 
-int main(int argc, char ** argv)
-{
-    char * username = getUsername();
+        // Receive and display the server's response
+        int bytesRead = recv(clientSocket, buffer, sizeof(buffer), 0);
+        if (bytesRead <= 0) {
+            std::cerr << "Server disconnected" << std::endl;
+            break;
+        }
 
-    if (enet_initialize() != 0)
-    {
-        std::cerr << "An error occurred while initializing ENet." << std::endl;
-        return EXIT_FAILURE;
-    }
-    atexit(enet_deinitialize);
-
-    ENetHost * client;
-    client = enet_host_create(NULL, 1, 1, 0, 0);
-
-    if (client == NULL)
-    {
-        std::cerr << "An error occurred while trying to create an ENet client host." << std::endl;
-        return EXIT_FAILURE;
+        buffer[bytesRead] = '\0';
+        std::cout << "Server response: " << buffer << std::endl;
     }
 
-    ENetAddress address;
-    ENetEvent event;
-    ENetPeer * peer;
+    // Close the client socket
+    close(clientSocket);
 
-    enet_address_set_host(&address, "localhost");
-    address.port = 2115;
-
-    peer = enet_host_connect(client, &address, 1, 0);
-    if (peer == NULL)
-    {
-        std::cerr << "No available peers for initiating an ENet connection." << std::endl;
-        return EXIT_FAILURE;
-    }
-
-    if (enet_host_service(client, &event, 5000) > 0 && event.type == ENET_EVENT_TYPE_CONNECT)
-    {
-        std::cout << "Connection to localhost:2115 succeeded." << std::endl;
-    }
-    else
-    {
-        enet_peer_reset(peer);
-        std::cout << "Connection to localhost:2115 failed." << std::endl;
-        return EXIT_SUCCESS; //here can return to main menu, retry, etc.
-    }
-
-    char message[256];
-    //Game loop
-    std::thread messageLoop(RecieveLoop, client);
-    
-    sendLoop(peer);
-
-    //Game loop end
-    
-
-    //enet_peer_disconnect(peer, 0);
-
-    return EXIT_SUCCESS;
+    return 0;
 }
