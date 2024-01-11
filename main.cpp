@@ -24,7 +24,8 @@ struct Room {
     std::string name;
     std::vector<Client*> clients;
 
-    Room(const std::string& roomName = "Room1") : name(roomName) {}
+    Room() {}
+    Room(const std::string& roomName) : name(roomName) {}
     
     void removeClient(Client* client) {
         clients.erase(std::remove(clients.begin(), clients.end(), client), clients.end());
@@ -45,15 +46,14 @@ void printStatus() {
     while (true) {
         std::getline(std::cin, input);
         if (input == "status") {
-            roomsMutex.lock();
+            std::lock_guard<std::mutex> lock(roomsMutex);
             std::cout << "Rooms: " << rooms.size() << std::endl;
-            for (int i = 0; i < rooms.size(); i++) {
-                std::cout << "-Room " << i + 1 << ": " << rooms[i].clients.size() << " clients" << std::endl;
-                for (const auto& client : rooms[i].clients) {
+            for (const auto& room : rooms) {
+                std::cout << "-Room " << room.name << ": " << room.clients.size() << " clients" << std::endl;
+                for (const auto& client : room.clients) {
                     std::cout << "--Client: " << client->name << std::endl;
                 }
             }
-            roomsMutex.unlock();
         }
     }
 }
@@ -118,6 +118,8 @@ void handleClient(Client** client, fd_set* masterSet) {
     }
 }
 
+int roomCount = 1;
+
 void startServer(int PORT, int MAX_CLIENTS) {
     int serverSocket = socket(AF_INET, SOCK_STREAM, 0);
     sockaddr_in serverAddress;
@@ -173,7 +175,7 @@ void startServer(int PORT, int MAX_CLIENTS) {
 
                     // Add the client to a room
                     if (rooms.empty()) {
-                        rooms.emplace_back();
+                        rooms.emplace_back("Room1");
                     }
 
                     Room* room = nullptr;
@@ -186,7 +188,8 @@ void startServer(int PORT, int MAX_CLIENTS) {
 
                     if (!room) {
                         // All rooms are full, create a new one
-                        rooms.push_back(Room("Room" + std::to_string(rooms.size() + 1)));
+                        roomCount++;
+                        rooms.push_back(Room("Room" + std::to_string(roomCount)));
                         room = &rooms.back();
                     }
 
