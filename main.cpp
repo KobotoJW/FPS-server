@@ -115,12 +115,15 @@ void handleClient(Client* client, fd_set* masterSet) {
     if ((bytesRead = recv(client->socket, buffer, sizeof(buffer), 0)) > 0) {
         // Process received data
         buffer[bytesRead] = '\0';
-        std::cout << "Received: " << buffer << std::endl;
-
+        if (client && client->room) {
+            std::cout << "Received from " << client->name << " in room " << client->room->name << ": " << buffer << std::endl;
+        } else {
+            std::cout << "Received: " << buffer << std::endl;
+        }
         // Implement your game logic here
 
         // Example: Send a response back to the client
-        send(client->socket, "Server: Message received", strlen("Server: Message received"), 0);
+        send(client->socket, "Message received", strlen("Message received"), 0);
     } else {
         // Client disconnected
         std::cout << "Client disconnected" << std::endl;
