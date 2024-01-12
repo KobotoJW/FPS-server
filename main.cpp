@@ -10,13 +10,37 @@
 int PORT;
 int MAX_CLIENTS;
 
+enum class PacketType {
+    Welcome,
+    Message,
+    PlayerPosition,
+    PlayerVelocity,
+    PlayerDisconnected
+};
+
+struct Packet {
+    PacketType type;
+    std::string message;
+    int playerId;
+    float x;
+    float y;
+    float vx;
+    float vy;
+};
+
 struct Room;
 
 struct Client {
     int socket;
-    std::string name;
     Room* room;
     bool disconnected = false;
+
+    int id;
+    int x;
+    int y;
+    int vx;
+    int vy;
+    
 };
 
 struct Room {
@@ -35,7 +59,7 @@ struct Room {
             std::string message = "In this room: ";
             for (auto& otherClient : clients) {
                 if (otherClient != client) {
-                    message += otherClient->name + ", ";
+                    message += otherClient->id + ", ";
                 }
             }
             message = message.substr(0, message.size() - 2); // Remove trailing comma
@@ -61,7 +85,7 @@ void printStatus() {
     for (const auto& room : rooms) {
         std::cout << "-Room " << room.name << ": " << room.clients.size() << " clients" << std::endl;
         for (const auto& client : room.clients) {
-            std::cout << "--Client: " << client->name << std::endl;
+            std::cout << "--Client: " << client->id << std::endl;
         }
     }
 }
@@ -116,7 +140,7 @@ void handleClient(Client* client, fd_set* masterSet) {
         // Process received data
         buffer[bytesRead] = '\0';
         if (client && client->room) {
-            std::cout << "Received from " << client->name << " in room " << client->room->name << ": " << buffer << std::endl;
+            std::cout << "Received from " << client->id << " in room " << client->room->name << ": " << buffer << std::endl;
         } else {
             std::cout << "Received: " << buffer << std::endl;
         }
@@ -130,6 +154,14 @@ void handleClient(Client* client, fd_set* masterSet) {
         handleClientDisconnect(client);
         FD_CLR(client->socket, masterSet);
     }
+}
+
+void sendWelcomePacket(Client* client) {
+    Packet packet;
+    packet.type = PacketType::Welcome;
+    packet.message = "Welcome: " + std::to_string(client->id);
+    packet.playerId = client->id;
+    send(client->socket, (char*)&packet, sizeof(packet), 0);
 }
 
 int roomCount = 1;
@@ -208,8 +240,9 @@ void startServer(int PORT, int MAX_CLIENTS) {
                         room = &rooms.back();
                     }
 
-                    room->clients.emplace_back(new Client{clientSocket, "Player" + std::to_string(room->clients.size() + 1)});
-                    std::cout << "Client connected: " << room->clients.back()->name << " to room: " << room->name << std::endl;
+                    room->clients.emplace_back(new Client{clientSocket, room, false, static_cast<int>(room->clients.size() + 1)});
+                    std::cout << "Client connected: " << room->clients.back()->id << " to room: " << room->name << std::endl;
+                    sendWelcomePacket(room->clients.back());
                 } else {
                     std::vector<Room*> roomsToClean;
                     {
