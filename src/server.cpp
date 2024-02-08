@@ -129,83 +129,83 @@ private:
                 }}
             }},
 
-            {"walls": [
+            {"walls", {
                 {
-                    {"position": {
-                        "x": 0,
-                        "y": 0
+                    {"position", {
+                        {"x", 0},
+                        {"y", 0}
                     }},
-                    {"dimensions": {
-                        "width": 800,
-                        "height": 50
+                    {"dimensions", {
+                        {"width", 800},
+                        {"height", 50}
                     }},
-                    {"color": {
-                        "r": 50,
-                        "g": 50,
-                        "b": 50
+                    {"color", {
+                        {"r", 50},
+                        {"g", 50},
+                        {"b", 50}
                     }}
                 },
                 {
-                    "position": {
-                        "x": 0,
-                        "y": 0
-                    },
-                    "dimensions": {
-                        "width": 50,
-                        "height": 600
-                    },
-                    "color": {
-                        "r": 50,
-                        "g": 50,
-                        "b": 50
-                    }
+                    {"position", {
+                        {"x", 0},
+                        {"y", 0}
+                    }},
+                    {"dimensions", {
+                        {"width", 50},
+                        {"height", 600}
+                    }},
+                    {"color", {
+                        {"r", 50},
+                        {"g", 50},
+                        {"b", 50}
+                    }}
                 },
                 {
-                    "position": {
-                        "x": 0,
-                        "y": 550
-                    },
-                    "dimensions": {
-                        "width": 800,
-                        "height": 50
-                    },
-                    "color": {
-                        "r": 50,
-                        "g": 50,
-                        "b": 50
-                    }
+                    {"position", {
+                        {"x", 0},
+                        {"y", 550}
+                    }},
+                    {"dimensions", {
+                        {"width", 800},
+                        {"height", 50}
+                    }},
+                    {"color", {
+                        {"r", 50},
+                        {"g", 50},
+                        {"b", 50}
+                    }}
                 },
                 {
-                    "position": {
-                        "x": 750,
-                        "y": 0
-                    },
-                    "dimensions": {
-                        "width": 50,
-                        "height": 600
-                    },
-                    "color": {
-                        "r": 50,
-                        "g": 50,
-                        "b": 50
-                    }
+                    {"position", {
+                        {"x", 750},
+                        {"y", 0}
+                    }},
+                    {"dimensions", {
+                        {"width", 50},
+                        {"height", 600}
+                    }},
+                    {"color", {
+                        {"r", 50},
+                        {"g", 50},
+                        {"b", 50}
+                    }}
                 },
                 {
-                    "position": {
-                        "x": 200,
-                        "y": 200
-                    },
-                    "dimensions": {
-                        "width": 400,
-                        "height": 50
-                    },
-                    "color": {
-                        "r": 50,
-                        "g": 50,
-                        "b": 50
-                    }
+                    {"position", {
+                        {"x", 200},
+                        {"y", 200}
+                    }},
+                    {"dimensions", {
+                        {"width", 400},
+                        {"height", 50}
+                    }},
+                    {"color", {
+                        {"r", 50},
+                        {"g", 50},
+                        {"b", 50}
+                    }}
                 }
-            ]}
+            }}
         };
 
         std::string mapString = map.dump();

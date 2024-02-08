@@ -163,7 +163,8 @@
                     update();
                     render();
                 case GameState::Disconnecting:
-                    break;
+                    disconnectFromServer();
+                    return;
                 }
                 
             }
@@ -222,6 +223,10 @@
             }
         }
 
+        void disconnectFromServer() {
+            socket.disconnect();
+            std::cout << "Disconnected from server (disconnectFromServer function)" << std::endl;
+        }
         
         //---------------------------------------------------------------------------
 
@@ -241,6 +246,7 @@
                 std::size_t received;
                 if (socket.receive(buffer, sizeof(buffer), received) != sf::Socket::Done) {
                     std::cout << "Error receiving json map data from server" << std::endl;
+                    gameState = GameState::Disconnecting;
                     return;
                 }
                 buffer[received] = '\0';
@@ -254,6 +260,7 @@
                 for (int i = 0; i < mapJson["walls"].size(); i++){
                     if (!mapJson["walls"][i].is_object() || !mapJson["walls"][i]["position"].is_object() || !mapJson["walls"][i]["dimensions"].is_object() || !mapJson["walls"][i]["color"].is_object()) {
                         std::cout << "Invalid JSON structure in walls array" << std::endl;
+                        std::cout << mapJson["walls"][i] << std::endl;
                         return;
                     }
                     walls.emplace_back(mapJson["walls"][i]["position"]["x"], mapJson["walls"][i]["position"]["y"], mapJson["walls"][i]["dimensions"]["width"], mapJson["walls"][i]["dimensions"]["height"], sf::Color(mapJson["walls"][i]["color"]["r"], mapJson["walls"][i]["color"]["g"], mapJson["walls"][i]["color"]["b"]));
