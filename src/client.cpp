@@ -68,6 +68,26 @@
             }
         }
 
+        void receiveBulletFromServer(sf::TcpSocket& socket){
+            if (socket.getRemoteAddress() == sf::IpAddress::None) {
+                std::cout << "Not connected to server in receive bullet" << std::endl;
+                return;
+            }
+            else{
+                //recieve data from server
+                char buffer[1024] = {0};
+                std::size_t received;
+                if (socket.receive(buffer, sizeof(buffer), received) != sf::Socket::Done) {
+                    std::cout << "Error receiving json bullet data from server" << std::endl;
+                    return;
+                }
+                //print parsed json
+                nlohmann::json receivedBulletJson = nlohmann::json::parse(buffer);
+                std::cout << "Parsed: " << receivedBulletJson << std::endl;
+                
+            }
+        }
+
         //--------------------------------------------------------------------------
 
     private:
@@ -93,10 +113,9 @@
 
         void shoot(float velocityX, float velocityY, sf::TcpSocket& socket) {
             if (shootClock.getElapsedTime().asSeconds() >= shootCooldown){
-                /*bullets.emplace_back(playerShape.getPosition().x + playerShape.getSize().x / 2,
-                                    playerShape.getPosition().y + playerShape.getSize().y / 2,
-                                    velocityX, velocityY);
-                */
+                // bullets.emplace_back(playerShape.getPosition().x + playerShape.getSize().x / 2,
+                //                     playerShape.getPosition().y + playerShape.getSize().y / 2,
+                //                     velocityX, velocityY);
             Bullet bullet(playerShape.getPosition().x + playerShape.getSize().x / 2,
                                     playerShape.getPosition().y + playerShape.getSize().y / 2,
                                     velocityX, velocityY);
@@ -154,22 +173,13 @@
                     if (connectToServer()) {
                         std::cout << "Connected to server (joining)" << std::endl;
                         recieveMapFromServer();
+                        std::cout << "Received map from server" << std::endl;
 
                         gameState = GameState::Playing;
                         break;
                     }
 
                 case GameState::Playing:
-                    if (pingServer() == -1) {
-                        int pingStatus = 0;
-                        for (int i = 0; i < 20; i++) {
-                            pingStatus += pingServer();
-                        }
-                        if (pingStatus == -20) {
-                            gameState = GameState::Disconnecting;
-                            break;
-                        }
-                    }
                     processEvents();
                     update();
                     render();
@@ -222,44 +232,50 @@
             }
             else{
                 //recieve data from server
-                char buffer[2000];
+                char buffer[1024];
                 std::size_t received;
                 if (socket.receive(buffer, sizeof(buffer), received) != sf::Socket::Done) {
                     std::cout << "Error receiving json data from server" << std::endl;
                     return;
                 }
-                //print received data
                 std::cout << "Received: " << buffer << std::endl;
-                //print parsed json
-                nlohmann::json receivedJson = nlohmann::json::parse(buffer);
-                std::cout << "Parsed: " << receivedJson << std::endl;
+
+                if (received == 4 && strncmp(buffer, "pong", 4) == 0) {
+                    std::cout << "Received pong from server" << std::endl;
+                    recievedPongFromServer();
+                    return;
+                    
+                } else {
+                    //parsed json
+                    nlohmann::json receivedJson = nlohmann::json::parse(buffer);
+
+                    if (receivedJson["type"] == "bullet") {
+                        std::cout << "Received bullet" << std::endl;
+                        Bullet bullet(receivedJson["position"][0], receivedJson["position"][1], receivedJson["velocity"][0], receivedJson["velocity"][1]);
+                        bullets.push_back(bullet);
+                    }
+                }
+
                 
             }
         }
 
-        int pingServer() {
+        void pingServer() {
             if (socket.getRemoteAddress() == sf::IpAddress::None) {
                 std::cout << "Not connected to server in pingServer" << std::endl;
-                return -1;
+                return;
             }
             else{
-                //send ping to server
+                pingClock.restart();
                 if (socket.send("ping", 4) != sf::Socket::Done) {
                     std::cout << "Error sending ping to server" << std::endl;
-                    return -1;
+                    return;
                 }
-                //recieve pong from server
-                char buffer[4];
-                std::size_t received;
-                if (socket.receive(buffer, sizeof(buffer), received) != sf::Socket::Done) {
-                    std::cout << "Error receiving pong from server" << std::endl;
-                    return -1;
-                }
-                if (std::string(buffer) == "pong") {
-                    return 0;
-                }
-                return -1;
             }
+        }
+
+        void recievedPongFromServer() {
+            disconnectClock.restart();
         }
 
         void disconnectFromServer() {
@@ -271,7 +287,8 @@
 
     private:
         GameState gameState;
-
+        sf::Clock disconnectClock;
+        sf::Clock pingClock;
         
 
         void recieveMapFromServer(){
@@ -281,7 +298,7 @@
             }
             else{
                 //recieve data from server
-                char buffer[2000] = {0};
+                char buffer[1024] = {0};
                 std::size_t received;
                 if (socket.receive(buffer, sizeof(buffer), received) != sf::Socket::Done) {
                     std::cout << "Error receiving json map data from server" << std::endl;
@@ -351,6 +368,7 @@
         }
 
         void update() {
+            receiveDataFromServer();
             // Update bullets
             for (auto& bullet : bullets) {
                 bullet.move();
@@ -363,12 +381,19 @@
                     }
                 }
             }
-
             // Remove bullets that are out of the screen
             bullets.erase(std::remove_if(bullets.begin(), bullets.end(), [](const Bullet& bullet) {
                 return bullet.getShape().getPosition().x < 0 || bullet.getShape().getPosition().x > 800 ||
                     bullet.getShape().getPosition().y < 0 || bullet.getShape().getPosition().y > 600;
             }), bullets.end());
+
+            if (pingClock.getElapsedTime().asSeconds() >= 1) {
+                pingServer();
+            }
+
+            if (disconnectClock.getElapsedTime().asSeconds() >= 3) {
+                gameState = GameState::Disconnecting;
+            }
         }
 
         void render() {

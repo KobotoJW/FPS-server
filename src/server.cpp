@@ -232,17 +232,28 @@ private:
 
     void handleReceivedData(int clientSocket, const char* data, ssize_t dataSize) {
         // Handle the received data from the client
-        // For now, just print the received message
+
         if (dataSize == 4 && strncmp(data, "ping", 4) == 0) {
+            std::cout << "Received ping from client" << std::endl;
             returnPong(clientSocket);
             return;
         }
+
+        std::cout << "Received data from client: " << data << std::endl;
         nlohmann::json dataJson = nlohmann::json::parse(data);
-        std::cout << "Received data from client: " << dataJson << std::endl;
+        std::cout << "Received data from client (JSON): " << dataJson << std::endl;
+
+        if (dataJson.contains("type") && dataJson["type"] == "bullet") {
+            // Send the bullet to all clients
+            for (int client : clientSockets) {
+                send(client, data, dataSize, 0);
+            }
+        }
     }
 
     void returnPong(int clientSocket) {
         send(clientSocket, "pong", 4, 0);
+        std::cout << "Returned pong to client" << std::endl;
     }
 
     void removeClientSocket(int clientSocket) {
