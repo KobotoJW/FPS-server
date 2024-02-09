@@ -214,7 +214,7 @@ private:
     }
 
     void handleClientData(int clientSocket) {
-        char buffer[1024];
+        char buffer[1024] = {0};
         ssize_t bytesRead = recv(clientSocket, buffer, sizeof(buffer), 0);
 
         if (bytesRead == -1) {

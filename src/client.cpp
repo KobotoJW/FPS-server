@@ -160,7 +160,6 @@
                     }
 
                 case GameState::Playing:
-                    std::cout << "GameState Playing" << std::endl;
                     if (pingServer() == -1) {
                         int pingStatus = 0;
                         for (int i = 0; i < 20; i++) {
