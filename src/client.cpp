@@ -141,7 +141,7 @@
 
     class Game {
     public:
-        Game() : window(sf::VideoMode(800, 600), "Simple 2D Game") {
+        Game() : window(sf::VideoMode(800, 600), "2D Client") {
             window.setFramerateLimit(60);
             gameState = GameState::Joining;
         }
@@ -152,17 +152,32 @@
                 switch (gameState) {
                 case GameState::Joining:
                     if (connectToServer()) {
-                        std::cout << "Connected to server" << std::endl;
+                        std::cout << "Connected to server (joining)" << std::endl;
                         recieveMapFromServer();
 
                         gameState = GameState::Playing;
+                        break;
                     }
-                    break;
+
                 case GameState::Playing:
+                    std::cout << "GameState Playing" << std::endl;
+                    if (pingServer() == -1) {
+                        int pingStatus = 0;
+                        for (int i = 0; i < 20; i++) {
+                            pingStatus += pingServer();
+                        }
+                        if (pingStatus == -20) {
+                            gameState = GameState::Disconnecting;
+                            break;
+                        }
+                    }
                     processEvents();
                     update();
                     render();
+                    break;
+
                 case GameState::Disconnecting:
+                    std::cout << "GameState Disconnecting" << std::endl;
                     disconnectFromServer();
                     return;
                 }
@@ -223,6 +238,31 @@
             }
         }
 
+        int pingServer() {
+            if (socket.getRemoteAddress() == sf::IpAddress::None) {
+                std::cout << "Not connected to server in pingServer" << std::endl;
+                return -1;
+            }
+            else{
+                //send ping to server
+                if (socket.send("ping", 4) != sf::Socket::Done) {
+                    std::cout << "Error sending ping to server" << std::endl;
+                    return -1;
+                }
+                //recieve pong from server
+                char buffer[4];
+                std::size_t received;
+                if (socket.receive(buffer, sizeof(buffer), received) != sf::Socket::Done) {
+                    std::cout << "Error receiving pong from server" << std::endl;
+                    return -1;
+                }
+                if (std::string(buffer) == "pong") {
+                    return 0;
+                }
+                return -1;
+            }
+        }
+
         void disconnectFromServer() {
             socket.disconnect();
             std::cout << "Disconnected from server (disconnectFromServer function)" << std::endl;
@@ -250,7 +290,7 @@
                     return;
                 }
                 buffer[received] = '\0';
-                //parse buffor to json
+                //parse buffer to json
                 nlohmann::json mapJson = nlohmann::json::parse(buffer);
 
                 floor.setFillColor(sf::Color(mapJson["floor"]["color"]["r"], mapJson["floor"]["color"]["g"], mapJson["floor"]["color"]["b"]));
@@ -260,17 +300,12 @@
                 for (int i = 0; i < mapJson["walls"].size(); i++){
                     if (!mapJson["walls"][i].is_object() || !mapJson["walls"][i]["position"].is_object() || !mapJson["walls"][i]["dimensions"].is_object() || !mapJson["walls"][i]["color"].is_object()) {
                         std::cout << "Invalid JSON structure in walls array" << std::endl;
-                        std::cout << mapJson["walls"][i] << std::endl;
+                        //std::cout << mapJson["walls"][i] << std::endl;
+                        gameState = GameState::Disconnecting;
                         return;
                     }
                     walls.emplace_back(mapJson["walls"][i]["position"]["x"], mapJson["walls"][i]["position"]["y"], mapJson["walls"][i]["dimensions"]["width"], mapJson["walls"][i]["dimensions"]["height"], sf::Color(mapJson["walls"][i]["color"]["r"], mapJson["walls"][i]["color"]["g"], mapJson["walls"][i]["color"]["b"]));
                 }
-                /*//print received data
-                std::cout << "Received: " << buffer << std::endl;
-                //print parsed json
-                nlohmann::json receivedJson = nlohmann::json::parse(buffer);
-                std::cout << "Parsed: " << receivedJson << std::endl;
-                */
             }
         }
 
@@ -310,6 +345,10 @@
                 player.shoot(-10, 0, socket);
             if (sf::Keyboard::isKeyPressed(sf::Keyboard::Right))
                 player.shoot(10, 0, socket);
+
+            if (sf::Keyboard::isKeyPressed(sf::Keyboard::Escape)) {
+                gameState = GameState::Disconnecting;
+            }
         }
 
         void update() {
