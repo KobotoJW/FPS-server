@@ -233,7 +233,7 @@
             }
             else{
                 //recieve data from server
-                char buffer[1024];
+                char buffer[1024] = {0};
                 std::size_t received;
                 if (socket.receive(buffer, sizeof(buffer), received) != sf::Socket::Done) {
                     return;
@@ -247,7 +247,9 @@
                     
                 } else {
                     //parsed json
+                    std::cout << "Parsing json" << std::endl;
                     nlohmann::json receivedJson = nlohmann::json::parse(buffer);
+                    std::cout << "Parsed" << std::endl;
 
                     if (receivedJson["type"] == "bullet") {
                         std::cout << "Received bullet" << std::endl;

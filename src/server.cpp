@@ -246,7 +246,7 @@ private:
         if (dataJson.contains("type") && dataJson["type"] == "bullet") {
             // Send the bullet to all clients
             for (int client : clientSockets) {
-                send(client, data, dataSize, 0);
+                send(client, dataJson.dump().c_str(), dataJson.dump().size(), 0);
             }
         }
     }
