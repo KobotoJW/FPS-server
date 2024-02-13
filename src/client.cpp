@@ -180,6 +180,7 @@
                     }
 
                 case GameState::Playing:
+                    socket.setBlocking(false);
                     processEvents();
                     update();
                     render();
@@ -235,7 +236,6 @@
                 char buffer[1024];
                 std::size_t received;
                 if (socket.receive(buffer, sizeof(buffer), received) != sf::Socket::Done) {
-                    std::cout << "Error receiving json data from server" << std::endl;
                     return;
                 }
                 std::cout << "Received: " << buffer << std::endl;
