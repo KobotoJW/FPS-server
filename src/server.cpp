@@ -11,6 +11,9 @@
 
 constexpr int MAX_EVENTS = 10;
 constexpr int PORT = 5000;
+//const std::string CAP_PRE = "5t4rt";
+const std::string CAP_POST = "5t0p";
+
 
 class Server {
 public:
@@ -225,8 +228,28 @@ private:
             close(clientSocket);
             removeClientSocket(clientSocket);
         } else {
-            // Handle the received data TODO
-            handleReceivedData(clientSocket, buffer, bytesRead);
+            // Handle the received data
+            // Decapsulate the data and add them to list
+            std::cout << "Buffer: " << buffer << std::endl;
+
+            std::vector<std::string> dataV;
+            std::string dataString = buffer;
+            size_t start = 0;
+            size_t end = 0;
+
+            std::cout << "Received data from client pre decap: " << dataString << std::endl;
+
+            while ((end = dataString.find(CAP_POST, start)) != std::string::npos) {
+                std::string data = dataString.substr(start, end - start);
+                dataString = dataString.substr(end + CAP_POST.size());
+                start = end + CAP_POST.size();
+                dataV.push_back(data);
+            }
+
+            for (std::string d : dataV) {
+                std::cout << "Received data from client cap: " << d << std::endl;
+                handleReceivedData(clientSocket, d.c_str(), d.size());
+            }
         }
     }
 
@@ -245,14 +268,16 @@ private:
 
         if (dataJson.contains("type") && dataJson["type"] == "bullet") {
             // Send the bullet to all clients
+            std::string dataJsonCap = dataJson.dump() + CAP_POST;
             for (int client : clientSockets) {
-                send(client, dataJson.dump().c_str(), dataJson.dump().size(), 0);
+                send(client, dataJsonCap.c_str(), dataJsonCap.size(), 0);
             }
         }
     }
 
     void returnPong(int clientSocket) {
-        send(clientSocket, "pong", 4, 0);
+        std::string pongMsg = "pong" + CAP_POST;
+        send(clientSocket, pongMsg.c_str(), pongMsg.size(), 0);
         std::cout << "Returned pong to client" << std::endl;
     }
 
