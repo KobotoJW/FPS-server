@@ -72,26 +72,6 @@ public:
         }
     }
 
-    void receiveBulletFromServer(sf::TcpSocket& socket){
-        if (socket.getRemoteAddress() == sf::IpAddress::None) {
-            std::cout << "Not connected to server in receive bullet" << std::endl;
-            return;
-        }
-        else{
-            //recieve data from server
-            char buffer[1024] = {0};
-            std::size_t received;
-            if (socket.receive(buffer, sizeof(buffer), received) != sf::Socket::Done) {
-                std::cout << "Error receiving json bullet data from server" << std::endl;
-                return;
-            }
-            //print parsed json
-            nlohmann::json receivedBulletJson = nlohmann::json::parse(buffer);
-            std::cout << "Parsed: " << receivedBulletJson << std::endl;
-            
-        }
-    }
-
     //--------------------------------------------------------------------------
 
 private:
@@ -140,6 +120,10 @@ public:
         playerShape.setPosition(position);
     }
 
+    void setFillColor(sf::Color color) {
+        playerShape.setFillColor(color);
+    }
+
     void restartShootClock() {
         shootClock.restart();
     }
@@ -148,11 +132,28 @@ public:
     nlohmann::json toJson() {
         return {
             {"type", "player"},
-            {"position", {playerShape.getPosition().x, playerShape.getPosition().y}},
-            {"velocity", {playerVelocity}}
+            {"position", {playerShape.getPosition().x, playerShape.getPosition().y}}
         };
     }
-    //---------------------------------------------------------------------------
+
+    void sendPlayerToServer(sf::TcpSocket& socket) {
+        if (socket.getRemoteAddress() == sf::IpAddress::None) {
+            std::cout << "Not connected to server in send player" << std::endl;
+            return;
+        }
+        else{
+            // Convert player data to json
+            nlohmann::json playerJson = toJson();
+            // Send json to server
+            std::string playerJsonMsg = playerJson.dump() + CAP_POST;
+            if (socket.send(playerJsonMsg.c_str(), playerJsonMsg.size()) != sf::Socket::Done) {
+                std::cout << "Error sending json player data to server" << std::endl;
+                return;
+            }
+        }
+    }
+
+    //--------------------------------------------------------------------------
 
 private:
     sf::RectangleShape playerShape;
@@ -296,6 +297,13 @@ public:
             std::cout << "Received bullet from server" << std::endl;
             Bullet bullet(dataJson["position"][0], dataJson["position"][1], dataJson["velocity"][0], dataJson["velocity"][1]);
             bullets.push_back(bullet);
+        } else if (dataJson.contains("type") && dataJson["type"] == "player"){
+            // Add the player to the list
+            std::cout << "Received player from server" << std::endl;
+            Player player;
+            player.setPosition(sf::Vector2f(dataJson["position"][0], dataJson["position"][1]));
+            player.setFillColor(sf::Color::Red);
+            players.push_back(player);
         }
     }
 
@@ -410,6 +418,7 @@ private:
 
     void update() {
         receiveDataFromServer();
+        player.sendPlayerToServer(socket);
         // Update bullets
         for (auto& bullet : bullets) {
             bullet.move();
@@ -427,6 +436,11 @@ private:
             return bullet.getShape().getPosition().x < 0 || bullet.getShape().getPosition().x > 800 ||
                 bullet.getShape().getPosition().y < 0 || bullet.getShape().getPosition().y > 600;
         }), bullets.end());
+
+        for (auto& player : players) {
+            window.draw(player.getShape());
+        }
+        players.clear();
 
         if (pingClock.getElapsedTime().asSeconds() >= 1) {
             pingServer();
@@ -457,6 +471,7 @@ private:
     sf::RenderWindow window;
     Player player;
     std::vector<Bullet> bullets;
+    std::vector<Player> players;
     std::vector<Wall> walls;
     sf::RectangleShape floor;
 

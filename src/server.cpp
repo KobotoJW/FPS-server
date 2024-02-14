@@ -243,6 +243,7 @@ private:
                 std::string data = dataString.substr(start, end - start);
                 dataString = dataString.substr(end + CAP_POST.size());
                 start = end + CAP_POST.size();
+                start = 0;
                 dataV.push_back(data);
             }
 
@@ -257,14 +258,14 @@ private:
         // Handle the received data from the client
 
         if (dataSize == 4 && strncmp(data, "ping", 4) == 0) {
-            std::cout << "Received ping from client" << std::endl;
+            //std::cout << "Received ping from client" << std::endl;
             returnPong(clientSocket);
             return;
         }
 
-        std::cout << "Received data from client: " << data << std::endl;
+        //std::cout << "Received data from client: " << data << std::endl;
         nlohmann::json dataJson = nlohmann::json::parse(data);
-        std::cout << "Received data from client (JSON): " << dataJson << std::endl;
+        //std::cout << "Received data from client (JSON): " << dataJson << std::endl;
 
         if (dataJson.contains("type") && dataJson["type"] == "bullet") {
             // Send the bullet to all clients
@@ -272,13 +273,22 @@ private:
             for (int client : clientSockets) {
                 send(client, dataJsonCap.c_str(), dataJsonCap.size(), 0);
             }
+        } else if (dataJson.contains("type") && dataJson["type"] == "player"){
+            // Send the player to all clients
+            std::string dataJsonCap = dataJson.dump() + CAP_POST;
+            for (int client : clientSockets) {
+                if (client != clientSocket){
+                    send(client, dataJsonCap.c_str(), dataJsonCap.size(), 0);
+                }            
+            }
         }
+        
     }
 
     void returnPong(int clientSocket) {
         std::string pongMsg = "pong" + CAP_POST;
         send(clientSocket, pongMsg.c_str(), pongMsg.size(), 0);
-        std::cout << "Returned pong to client" << std::endl;
+        //std::cout << "Returned pong to client" << std::endl;
     }
 
     void removeClientSocket(int clientSocket) {
