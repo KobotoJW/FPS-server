@@ -2,9 +2,11 @@
 #include <SFML/Graphics.hpp>
 #include <iostream>
 #include <nlohmann/json.hpp>
+#include <random>
 
 //const std::string CAP_PRE = "5t4rt";
 const std::string CAP_POST = "5t0p";
+
 
 enum class GameState {
     Joining,
@@ -83,7 +85,7 @@ class Player {
 public:
     Player() : playerShape(sf::Vector2f(50, 50)), playerVelocity(5.0f) {
         playerShape.setFillColor(sf::Color::Green);
-        playerShape.setPosition(375, 275);
+        playerShape.setPosition(400, 300);
         playerShape.getPosition();
     }
 
@@ -166,7 +168,7 @@ private:
 class Game {
 public:
     Game() : window(sf::VideoMode(800, 600), "2D Client") {
-        window.setFramerateLimit(60);
+        window.setFramerateLimit(30);
         gameState = GameState::Joining;
     }
 
@@ -298,7 +300,6 @@ public:
             Bullet bullet(dataJson["position"][0], dataJson["position"][1], dataJson["velocity"][0], dataJson["velocity"][1]);
             bullets.push_back(bullet);
         } else if (dataJson.contains("type") && dataJson["type"] == "player"){
-            // Add the player to the list
             std::cout << "Received player from server" << std::endl;
             Player player;
             player.setPosition(sf::Vector2f(dataJson["position"][0], dataJson["position"][1]));
@@ -384,14 +385,22 @@ private:
         // Store the player's previous position before moving
         sf::Vector2f prevPosition = player.getPosition();
 
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::W) && player.getShape().getPosition().y > 0)
-            player.move(0, -1);
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::S) && player.getShape().getPosition().y < window.getSize().y - player.getShape().getSize().y)
-            player.move(0, 1);
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::A) && player.getShape().getPosition().x > 0)
-            player.move(-1, 0);
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::D) && player.getShape().getPosition().x < window.getSize().x - player.getShape().getSize().x)
-            player.move(1, 0);
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::W) && player.getShape().getPosition().y > 0){
+            player.move(0, -2);
+            player.sendPlayerToServer(socket);
+        }
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::S) && player.getShape().getPosition().y < window.getSize().y - player.getShape().getSize().y){
+            player.move(0, 2);
+            player.sendPlayerToServer(socket);
+        }
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::A) && player.getShape().getPosition().x > 0){
+            player.move(-2, 0);
+            player.sendPlayerToServer(socket);
+        }
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::D) && player.getShape().getPosition().x < window.getSize().x - player.getShape().getSize().x){
+            player.move(2, 0);
+            player.sendPlayerToServer(socket);
+        }
 
         // Check for collisions with walls
         for (const auto& wall : walls) {
@@ -402,15 +411,23 @@ private:
             }
         }
 
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Up))
-            player.shoot(0, -10, socket);
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Down))
-            player.shoot(0, 10, socket);
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Left))
-            player.shoot(-10, 0, socket);
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Right))
-            player.shoot(10, 0, socket);
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Up)){
+            player.shoot(0, -20, socket);
+            player.sendPlayerToServer(socket);
+        }
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Down)){
+            player.shoot(0, 20, socket);
+            player.sendPlayerToServer(socket);
+        }
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Left)){
+            player.shoot(-20, 0, socket);
+            player.sendPlayerToServer(socket);
+        }
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Right)){
+            player.shoot(20, 0, socket);
+            player.sendPlayerToServer(socket);
 
+        }
         if (sf::Keyboard::isKeyPressed(sf::Keyboard::Escape)) {
             gameState = GameState::Disconnecting;
         }
@@ -418,7 +435,6 @@ private:
 
     void update() {
         receiveDataFromServer();
-        player.sendPlayerToServer(socket);
         // Update bullets
         for (auto& bullet : bullets) {
             bullet.move();
@@ -436,11 +452,6 @@ private:
             return bullet.getShape().getPosition().x < 0 || bullet.getShape().getPosition().x > 800 ||
                 bullet.getShape().getPosition().y < 0 || bullet.getShape().getPosition().y > 600;
         }), bullets.end());
-
-        for (auto& player : players) {
-            window.draw(player.getShape());
-        }
-        players.clear();
 
         if (pingClock.getElapsedTime().asSeconds() >= 1) {
             pingServer();
@@ -463,6 +474,10 @@ private:
         // Draw bullets
         for (const auto& bullet : bullets) {
             window.draw(bullet.getShape());
+        }
+
+        for (auto& player : players) {
+            window.draw(player.getShape());
         }
 
         window.display();

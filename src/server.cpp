@@ -222,6 +222,7 @@ private:
 
         if (bytesRead == -1) {
             perror("Error receiving data from client");
+            removeClientSocket(clientSocket);
         } else if (bytesRead == 0) {
             // Connection closed by client
             std::cout << "Client disconnected" << std::endl;
