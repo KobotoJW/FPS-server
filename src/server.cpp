@@ -284,7 +284,7 @@ private:
             for (int client : clientSockets) {
                 send(client, dataJsonCap.c_str(), dataJsonCap.size(), 0);
             }
-            std::cout << "Received bullet from client" << std::endl;
+            std::cout << "Received bullet from client: " << clientSocket << std::endl;
         } else if (dataJson.contains("type") && dataJson["type"] == "player"){
             // Send the player to all clients
             std::string dataJsonCap = dataJson.dump() + CAP_POST;
@@ -293,7 +293,7 @@ private:
                     send(client, dataJsonCap.c_str(), dataJsonCap.size(), 0);
                 }            
             }
-            std::cout << "Received player from client" << std::endl;
+            std::cout << "Received player from client: " << clientSocket << std::endl;
         }
         
     }

@@ -125,26 +125,25 @@ void Game::handleReceivedData(const char* data, ssize_t dataSize) {
     } 
     // Players
     else if (dataJson.contains("type") && dataJson["type"] == "player") {
-        std::cout << "Received player from server" << std::endl;
         int recievedId = dataJson["id"];
+        std::cout << "Received player from server, id: " << recievedId << std::endl;
         if (recievedId == player.getPlayerId()) {
             return;
         }
-        if (players.size() > 0) {
-            for (auto& player : players) {
-                if (player.getPlayerId() == recievedId) {
-                    player.setPosition(sf::Vector2f(dataJson["position"][0], dataJson["position"][1]));
-                    return;
-                }
+
+        for (auto& player : players) {
+            if (player.getPlayerId() == recievedId) {
+                player.setPosition(sf::Vector2f(dataJson["position"][0], dataJson["position"][1]));
+                return;
             }
-        } else {
-            Player newPlayer;
-            newPlayer.setPosition(sf::Vector2f(dataJson["position"][0], dataJson["position"][1]));
-            newPlayer.setPlayerId(recievedId);
-            newPlayer.setFillColor(sf::Color::Red);
-            players.push_back(newPlayer);
-            players.back().setPlayerIdText();
         }
+        std::cout << "Creating new player" << std::endl;
+        Player newPlayer;
+        newPlayer.setPosition(sf::Vector2f(dataJson["position"][0], dataJson["position"][1]));
+        newPlayer.setPlayerId(recievedId);
+        newPlayer.setFillColor(sf::Color::Red);
+        players.push_back(newPlayer);
+        players.back().setPlayerIdText();
     } 
     
     else if (dataJson.contains("type") && dataJson["type"] == "playerId") {
@@ -260,19 +259,19 @@ void Game::processEvents() {
 
     if (sf::Keyboard::isKeyPressed(sf::Keyboard::Up)){
         player.shoot(0, -20, socket);
-        player.sendPlayerToServer(socket);
+        //player.sendPlayerToServer(socket);
     }
     if (sf::Keyboard::isKeyPressed(sf::Keyboard::Down)){
         player.shoot(0, 20, socket);
-        player.sendPlayerToServer(socket);
+        //player.sendPlayerToServer(socket);
     }
     if (sf::Keyboard::isKeyPressed(sf::Keyboard::Left)){
         player.shoot(-20, 0, socket);
-        player.sendPlayerToServer(socket);
+        //player.sendPlayerToServer(socket);
     }
     if (sf::Keyboard::isKeyPressed(sf::Keyboard::Right)){
         player.shoot(20, 0, socket);
-        player.sendPlayerToServer(socket);
+        //player.sendPlayerToServer(socket);
 
     }
     if (sf::Keyboard::isKeyPressed(sf::Keyboard::Escape)) {
