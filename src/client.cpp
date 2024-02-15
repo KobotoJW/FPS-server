@@ -8,8 +8,6 @@
 #include "Player.h"
 #include "Game.h"
 
-const std::string CAP_POST = "5t0p";
-
 int main() {
     Game game;
     game.run();

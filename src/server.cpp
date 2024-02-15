@@ -231,14 +231,14 @@ private:
         } else {
             // Handle the received data
             // Decapsulate the data and add them to list
-            std::cout << "Buffer: " << buffer << std::endl;
+            //std::cout << "Buffer: " << buffer << std::endl;
 
             std::vector<std::string> dataV;
             std::string dataString = buffer;
             size_t start = 0;
             size_t end = 0;
 
-            std::cout << "Received data from client pre decap: " << dataString << std::endl;
+            //std::cout << "Received data from client pre decap: " << dataString << std::endl;
 
             while ((end = dataString.find(CAP_POST, start)) != std::string::npos) {
                 std::string data = dataString.substr(start, end - start);
@@ -249,7 +249,7 @@ private:
             }
 
             for (std::string d : dataV) {
-                std::cout << "Received data from client cap: " << d << std::endl;
+                //std::cout << "Received data from client cap: " << d << std::endl;
                 handleReceivedData(clientSocket, d.c_str(), d.size());
             }
         }
@@ -261,6 +261,16 @@ private:
         if (dataSize == 4 && strncmp(data, "ping", 4) == 0) {
             //std::cout << "Received ping from client" << std::endl;
             returnPong(clientSocket);
+            return;
+        } else if (strcmp(data, "Gimmie dat tasty tasty id") == 0) {
+            //std::cout << "Received player id request from client" << std::endl;
+            // Send the player id to the client
+            nlohmann::json playerIdJson = {
+                {"type", "playerId"},
+                {"id", clientSocket}
+            };
+            std::string playerIdJsonCap = playerIdJson.dump() + CAP_POST;
+            send(clientSocket, playerIdJsonCap.c_str(), playerIdJsonCap.size(), 0);
             return;
         }
 
@@ -274,6 +284,7 @@ private:
             for (int client : clientSockets) {
                 send(client, dataJsonCap.c_str(), dataJsonCap.size(), 0);
             }
+            std::cout << "Received bullet from client" << std::endl;
         } else if (dataJson.contains("type") && dataJson["type"] == "player"){
             // Send the player to all clients
             std::string dataJsonCap = dataJson.dump() + CAP_POST;
@@ -282,6 +293,7 @@ private:
                     send(client, dataJsonCap.c_str(), dataJsonCap.size(), 0);
                 }            
             }
+            std::cout << "Received player from client" << std::endl;
         }
         
     }
@@ -316,6 +328,11 @@ private:
                     
                 }
             }
+            // std::cout << "Number of clients: " << clientSockets.size() << std::endl;
+            // std::cout << "List of clients: " << std::endl;
+            // for (int client : clientSockets) {
+            //     std::cout << client << std::endl;
+            // }
         }
     }
 };

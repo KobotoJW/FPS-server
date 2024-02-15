@@ -19,7 +19,6 @@ public:
     void run();
     sf::TcpSocket& getSocket();
     bool connectToServer();
-    void sendDataToServer();
     void receiveDataFromServer();
     void handleReceivedData(const char* data, ssize_t dataSize);
     void pingServer();

@@ -17,6 +17,8 @@ void Game::run() {
                 std::cout << "Connected to server (joining)" << std::endl;
                 recieveMapFromServer();
                 std::cout << "Received map from server" << std::endl;
+                player.getPlayerIdFromServer(socket);
+                std::cout << "Requested player id from server" << std::endl;
 
                 gameState = GameState::Playing;
                 break;
@@ -53,22 +55,6 @@ bool Game::connectToServer() {
     return true;
 }
 
-void Game::sendDataToServer() {
-    if (socket.getRemoteAddress() == sf::IpAddress::None) {
-        std::cout << "Not connected to server in send json" << std::endl;
-        return;
-    }
-    else{
-        //convert player data to json
-        nlohmann::json playerJson = player.toJson();
-        //send json to server
-        if (socket.send(playerJson.dump().c_str(), playerJson.dump().size()) != sf::Socket::Done) {
-            std::cout << "Error sending json data to server" << std::endl;
-            return;
-        }
-    }
-}
-
 void Game::receiveDataFromServer(){
     if (socket.getRemoteAddress() == sf::IpAddress::None) {
         std::cout << "Not connected to server in receive" << std::endl;
@@ -84,14 +70,14 @@ void Game::receiveDataFromServer(){
         
         // Handle the received data
         // Decapsulate the data and add them to list
-        std::cout << "Buffer: " << buffer << std::endl;
+        //std::cout << "Buffer: " << buffer << std::endl;
 
         std::vector<std::string> dataV;
         std::string dataString = buffer;
         size_t start = 0;
         size_t end = 0;
 
-        std::cout << "Received data from server pre decap: " << dataString << std::endl;
+        //std::cout << "Received data from server pre decap: " << dataString << std::endl;
 
         while ((end = dataString.find(CAP_POST, start)) != std::string::npos) {
             std::string data = dataString.substr(start, end - start);
@@ -101,7 +87,7 @@ void Game::receiveDataFromServer(){
         }
 
         for (std::string d : dataV) {
-            std::cout << "Received data from server cap: " << d << std::endl;
+            //std::cout << "Received data from server cap: " << d << std::endl;
             handleReceivedData(d.c_str(), d.size());
         }
     }
@@ -111,12 +97,12 @@ void Game::handleReceivedData(const char* data, ssize_t dataSize) {
     // Handle the received data from the server
 
     if (dataSize == 4 && strncmp(data, "pong", 4) == 0) {
-        std::cout << "Received ping from server" << std::endl;
+        //std::cout << "Received ping from server" << std::endl;
         recievedPongFromServer();
         return;
     }
 
-    std::cout << "Received data from server: " << data << std::endl;
+    //std::cout << "Received data from server: " << data << std::endl;
     nlohmann::json dataJson;
     try
     {
@@ -128,32 +114,57 @@ void Game::handleReceivedData(const char* data, ssize_t dataSize) {
     }
     
 
-    std::cout << "Received data from server (JSON): " << dataJson << std::endl;
+    //std::cout << "Received data from server (JSON): " << dataJson << std::endl;
 
+    // Bullets
     if (dataJson.contains("type") && dataJson["type"] == "bullet") {
         // Add the bullet to the list
         std::cout << "Received bullet from server" << std::endl;
         Bullet bullet(dataJson["position"][0], dataJson["position"][1], dataJson["velocity"][0], dataJson["velocity"][1]);
         bullets.push_back(bullet);
-    } else if (dataJson.contains("type") && dataJson["type"] == "player"){
+    } 
+    // Players
+    else if (dataJson.contains("type") && dataJson["type"] == "player") {
         std::cout << "Received player from server" << std::endl;
-        Player player;
-        player.setPosition(sf::Vector2f(dataJson["position"][0], dataJson["position"][1]));
-        player.setFillColor(sf::Color::Red);
-        players.push_back(player);
+        int recievedId = dataJson["id"];
+        if (recievedId == player.getPlayerId()) {
+            return;
+        }
+        if (players.size() > 0) {
+            for (auto& player : players) {
+                if (player.getPlayerId() == recievedId) {
+                    player.setPosition(sf::Vector2f(dataJson["position"][0], dataJson["position"][1]));
+                    return;
+                }
+            }
+        } else {
+            Player newPlayer;
+            newPlayer.setPosition(sf::Vector2f(dataJson["position"][0], dataJson["position"][1]));
+            newPlayer.setPlayerId(recievedId);
+            newPlayer.setFillColor(sf::Color::Red);
+            players.push_back(newPlayer);
+            players.back().setPlayerIdText();
+        }
+    } 
+    
+    else if (dataJson.contains("type") && dataJson["type"] == "playerId") {
+        std::cout << "Received player id from server" << std::endl;
+        player.setPlayerId(dataJson["id"]);
+        player.setPlayerIdText();
     }
 }
 
 void Game::pingServer() {
+    size_t sent;
     std::string pingMsg = "ping" + CAP_POST;
-    std::cout << "PingMsg: " << pingMsg << std::endl;
+    //std::cout << "PingMsg: " << pingMsg << std::endl;
     if (socket.getRemoteAddress() == sf::IpAddress::None) {
         std::cout << "Not connected to server in pingServer" << std::endl;
         return;
     }
     else{
         pingClock.restart();
-        if (socket.send(pingMsg.c_str(), pingMsg.size()) != sf::Socket::Done) {
+        if (socket.send(pingMsg.c_str(), pingMsg.size(), sent) != sf::Socket::Done) {
             std::cout << "Error sending ping to server" << std::endl;
             return;
         }
@@ -307,23 +318,17 @@ void Game::render() {
     }
 
     window.draw(player.getShape());
+    window.draw(player.getIdText());
+
     // Draw bullets
     for (const auto& bullet : bullets) {
         window.draw(bullet.getShape());
     }
-
+    // Draw players
     for (auto& player : players) {
         window.draw(player.getShape());
+        window.draw(player.getIdText());
     }
 
     window.display();
 }
-
-// sf::RenderWindow window;
-// Player player;
-// std::vector<Bullet> bullets;
-// std::vector<Player> players;
-// std::vector<Wall> walls;
-// sf::RectangleShape floor;
-
-// sf::TcpSocket socket;

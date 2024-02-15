@@ -34,9 +34,10 @@ void Bullet::sendBulletToServer(sf::TcpSocket& socket) {
         return;
     }
     else{
+        size_t sent = 0;
         nlohmann::json bulletJson = toJson();
         std::string bulletJsonMsg = bulletJson.dump() + CAP_POST;
-        if (socket.send(bulletJsonMsg.c_str(), bulletJsonMsg.size()) != sf::Socket::Done) {
+        if (socket.send(bulletJsonMsg.c_str(), bulletJsonMsg.size(), sent) != sf::Socket::Done) {
             std::cout << "Error sending json bullet data to server" << std::endl;
             return;
         }
