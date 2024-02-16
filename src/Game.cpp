@@ -81,7 +81,6 @@ void Game::receiveDataFromServer(){
 
         while ((end = dataString.find(CAP_POST, start)) != std::string::npos) {
             std::string data = dataString.substr(start, end - start);
-            dataString = dataString.substr(end + CAP_POST.size());
             start = end + CAP_POST.size();
             dataV.push_back(data);
         }
@@ -111,6 +110,8 @@ void Game::handleReceivedData(const char* data, ssize_t dataSize) {
     catch(const std::exception& e)
     {
         std::cerr << e.what() << '\n';
+        //std::cout << data << std::endl;
+        return;
     }
     
 
@@ -126,7 +127,7 @@ void Game::handleReceivedData(const char* data, ssize_t dataSize) {
     // Players
     else if (dataJson.contains("type") && dataJson["type"] == "player") {
         int recievedId = dataJson["id"];
-        std::cout << "Received player from server, id: " << recievedId << std::endl;
+        //std::cout << "Received player from server, id: " << recievedId << std::endl;
         if (recievedId == player.getPlayerId()) {
             return;
         }
@@ -144,12 +145,27 @@ void Game::handleReceivedData(const char* data, ssize_t dataSize) {
         newPlayer.setFillColor(sf::Color::Red);
         players.push_back(newPlayer);
         players.back().setPlayerIdText();
+        //std::cout << "New player created" << std::endl;
     } 
-    
+    // Player Id
     else if (dataJson.contains("type") && dataJson["type"] == "playerId") {
         std::cout << "Received player id from server" << std::endl;
         player.setPlayerId(dataJson["id"]);
         player.setPlayerIdText();
+    }
+
+    else if (dataJson.contains("type") && dataJson["type"] == "playerDisconnect") {
+        std::cout << "Received player disconnect from server" << std::endl;
+        int disconnectedId = dataJson["id"];
+        for (auto it = players.begin(); it != players.end(); ++it) {
+            if (it->getPlayerId() == disconnectedId) {
+                players.erase(it);
+                break;
+            }
+        }
+    }
+    else {
+        std::cout << "Invalid JSON data received from server" << std::endl;
     }
 }
 
@@ -233,19 +249,15 @@ void Game::processEvents() {
 
     if (sf::Keyboard::isKeyPressed(sf::Keyboard::W) && player.getShape().getPosition().y > 0){
         player.move(0, -2);
-        player.sendPlayerToServer(socket);
     }
     if (sf::Keyboard::isKeyPressed(sf::Keyboard::S) && player.getShape().getPosition().y < window.getSize().y - player.getShape().getSize().y){
         player.move(0, 2);
-        player.sendPlayerToServer(socket);
     }
     if (sf::Keyboard::isKeyPressed(sf::Keyboard::A) && player.getShape().getPosition().x > 0){
         player.move(-2, 0);
-        player.sendPlayerToServer(socket);
     }
     if (sf::Keyboard::isKeyPressed(sf::Keyboard::D) && player.getShape().getPosition().x < window.getSize().x - player.getShape().getSize().x){
         player.move(2, 0);
-        player.sendPlayerToServer(socket);
     }
 
     // Check for collisions with walls
@@ -280,6 +292,7 @@ void Game::processEvents() {
 }
 
 void Game::update() {
+    player.sendPlayerToServer(socket);
     receiveDataFromServer();
     // Update bullets
     for (auto& bullet : bullets) {
@@ -324,9 +337,9 @@ void Game::render() {
         window.draw(bullet.getShape());
     }
     // Draw players
-    for (auto& player : players) {
-        window.draw(player.getShape());
-        window.draw(player.getIdText());
+    for (auto& p : players) {
+        window.draw(p.getShape());
+        //window.draw(p.getIdText());
     }
 
     window.display();

@@ -42,6 +42,11 @@ private:
             perror("Error creating server socket");
             return false;
         }
+        int yes = 1;
+        if (setsockopt(serverSocket, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1) {
+            perror("setsockopt");
+            exit(1);
+        }
 
         if (bind(serverSocket, reinterpret_cast<sockaddr*>(&serverAddr), sizeof(serverAddr)) == -1) {
             perror("Error binding server socket");
@@ -222,10 +227,21 @@ private:
 
         if (bytesRead == -1) {
             perror("Error receiving data from client");
+            for (int client : clientSockets) {
+                if (client != clientSocket) {
+                    sendPlayerDisconnected(client);
+                }
+            }
             removeClientSocket(clientSocket);
+            return;
         } else if (bytesRead == 0) {
             // Connection closed by client
-            std::cout << "Client disconnected" << std::endl;
+            std::cout << "Client disconnected: " << clientSocket << std::endl;
+            for (int client : clientSockets) {
+                if (client != clientSocket) {
+                    sendPlayerDisconnected(client);
+                }
+            }
             close(clientSocket);
             removeClientSocket(clientSocket);
         } else {
@@ -242,9 +258,7 @@ private:
 
             while ((end = dataString.find(CAP_POST, start)) != std::string::npos) {
                 std::string data = dataString.substr(start, end - start);
-                dataString = dataString.substr(end + CAP_POST.size());
                 start = end + CAP_POST.size();
-                start = 0;
                 dataV.push_back(data);
             }
 
@@ -293,7 +307,7 @@ private:
                     send(client, dataJsonCap.c_str(), dataJsonCap.size(), 0);
                 }            
             }
-            std::cout << "Received player from client: " << clientSocket << std::endl;
+            //std::cout << "Received player from client: " << clientSocket << std::endl;
         }
         
     }
@@ -302,6 +316,19 @@ private:
         std::string pongMsg = "pong" + CAP_POST;
         send(clientSocket, pongMsg.c_str(), pongMsg.size(), 0);
         //std::cout << "Returned pong to client" << std::endl;
+    }
+
+    void sendPlayerDisconnected(int clientSocket) {
+        nlohmann::json playerDisconnectedJson = {
+            {"type", "playerDisconnected"},
+            {"id", clientSocket}
+        };
+        std::string playerDisconnectedJsonCap = playerDisconnectedJson.dump() + CAP_POST;
+        for (int client : clientSockets) {
+            if (client != clientSocket) {
+                send(client, playerDisconnectedJsonCap.c_str(), playerDisconnectedJsonCap.size(), 0);
+            }
+        }
     }
 
     void removeClientSocket(int clientSocket) {
