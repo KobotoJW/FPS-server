@@ -12,6 +12,7 @@ public:
     Player();
 
     mutable sf::Text idText;
+    mutable sf::Text healthText;
     sf::Font font;
 
     void setPlayerIdText();
@@ -26,6 +27,15 @@ public:
     void restartShootClock();
     void setPlayerId(int id);
     int getPlayerId();
+    void setPlayerHealth(int health);
+    void decreasePlayerHealth(int damage);
+    int getPlayerHealth();
+    void setPlayerHealthText();
+    sf::Text& getHealthText();
+    bool checkIfHitByBullet(const Bullet& bullet);
+    void checkIfDead();
+    void setPlayerAlive(bool alive);
+    bool getPlayerAlive();
 
 
     void getPlayerIdFromServer(sf::TcpSocket& socket);
@@ -37,6 +47,8 @@ private:
     sf::RectangleShape playerShape;
     float playerVelocity;
     int playerId;
+    int playerHealth;
+    bool playerAlive;
 
     sf::Clock shootClock;
     float shootCooldown = 0.5f;

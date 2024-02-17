@@ -10,6 +10,7 @@
 enum class GameState {
     Joining,
     Playing,
+    Dead,
     Disconnecting
 };
 
@@ -33,6 +34,8 @@ private:
     void processEvents();
     void update();
     void render();
+    void processDeadState();
+    void respawnPlayer();
 
     sf::RenderWindow window;
     Player player;

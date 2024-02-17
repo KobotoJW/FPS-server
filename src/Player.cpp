@@ -8,6 +8,18 @@ Player::Player() : playerShape(sf::Vector2f(50, 50)), playerVelocity(5.0f), play
     playerShape.setPosition(400, 300);
 }
 
+void Player::setPlayerHealth(int health) {
+    playerHealth = health;
+}
+
+int Player::getPlayerHealth() {
+    return playerHealth;
+}
+
+void Player::decreasePlayerHealth(int damage) {
+    playerHealth -= damage;
+}
+
 void Player::setPlayerId(int id) {
     playerId = id;
 }
@@ -41,6 +53,20 @@ const sf::RectangleShape& Player::getShape() const {
     return playerShape;
 }
 
+void Player::setPlayerHealthText() {
+    font.loadFromFile("Arial.ttf");
+    healthText.setFont(font);
+    healthText.setCharacterSize(32);
+    healthText.setFillColor(sf::Color::Black);
+    healthText.setString("HP: " + std::to_string(playerHealth));
+    healthText.setPosition(10,10);
+}
+
+sf::Text& Player::getHealthText() {
+    healthText.setString("HP: " + std::to_string(playerHealth));
+    return healthText;
+}
+
 void Player::setPlayerIdText() {
     font.loadFromFile("Arial.ttf");
     idText.setFont(font);
@@ -59,10 +85,10 @@ sf::Text& Player::getIdText() {
 
 void Player::shoot(float velocityX, float velocityY, sf::TcpSocket& socket) {
     if (shootClock.getElapsedTime().asSeconds() >= shootCooldown){
-        Bullet bullet(playerShape.getPosition().x + playerShape.getSize().x / 2,
+        Bullet b(playerShape.getPosition().x + playerShape.getSize().x / 2,
                       playerShape.getPosition().y + playerShape.getSize().y / 2,
-                      velocityX, velocityY);
-        bullet.sendBulletToServer(socket);
+                      velocityX, velocityY, getPlayerId());
+        b.sendBulletToServer(socket);
         shootClock.restart();
     }
 }
@@ -91,7 +117,9 @@ nlohmann::json Player::toJson() {
     return {
         {"type", "player"},
         {"position", {playerShape.getPosition().x, playerShape.getPosition().y}},
-        {"id", playerId}
+        {"id", playerId},
+        {"health", playerHealth},
+        {"alive", playerAlive}
     };
 }
 
@@ -108,5 +136,28 @@ void Player::sendPlayerToServer(sf::TcpSocket& socket) {
             std::cout << "Error sending json player data to server" << std::endl;
             return;
         }
+    }
+}
+
+void Player::setPlayerAlive(bool alive) {
+    playerAlive = alive;
+}
+
+bool Player::getPlayerAlive() {
+    return playerAlive;
+}
+
+bool Player::checkIfHitByBullet(const Bullet& bullet) {
+    if (playerShape.getGlobalBounds().intersects(bullet.getShape().getGlobalBounds()) && bullet.getOwner() != playerId){
+        decreasePlayerHealth(50);
+        std::cout << "Got hit by bullet from player: " << bullet.getOwner() << std::endl;
+        return true;
+    }
+    return false;
+}
+
+void Player::checkIfDead() {
+    if (playerHealth <= 0) {
+        setPlayerAlive(false);
     }
 }

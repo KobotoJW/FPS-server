@@ -8,10 +8,10 @@
 #include <algorithm>
 #include <nlohmann/json.hpp>
 #include <arpa/inet.h>
+#include <signal.h>
 
 constexpr int MAX_EVENTS = 10;
 constexpr int PORT = 5000;
-//const std::string CAP_PRE = "5t4rt";
 const std::string CAP_POST = "5t0p";
 
 
@@ -324,9 +324,18 @@ private:
             {"id", clientSocket}
         };
         std::string playerDisconnectedJsonCap = playerDisconnectedJson.dump() + CAP_POST;
-        for (int client : clientSockets) {
-            if (client != clientSocket) {
-                send(client, playerDisconnectedJsonCap.c_str(), playerDisconnectedJsonCap.size(), 0);
+
+        auto it = clientSockets.begin();
+        while (it != clientSockets.end()) {
+            if (*it != clientSocket) {
+                if (send(*it, playerDisconnectedJsonCap.c_str(), playerDisconnectedJsonCap.size(), 0) == -1) {
+                    perror("Error sending player disconnected message to client");
+                    it = clientSockets.erase(it);  // Remove the client from the list
+                } else {
+                    ++it;
+                }
+            } else {
+                ++it;
             }
         }
     }

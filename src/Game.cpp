@@ -20,15 +20,25 @@ void Game::run() {
                 player.getPlayerIdFromServer(socket);
                 std::cout << "Requested player id from server" << std::endl;
 
+                socket.setBlocking(false);
+                player.setPlayerHealth(100);
+                player.setPlayerAlive(1);
                 gameState = GameState::Playing;
                 break;
             }
 
         case GameState::Playing:
-            socket.setBlocking(false);
             processEvents();
             update();
             render();
+            break;
+
+        case GameState::Dead:
+            //std::cout << "GameState Dead" << std::endl;
+            processDeadState();
+            update();
+            render();
+            respawnPlayer();
             break;
 
         case GameState::Disconnecting:
@@ -121,7 +131,7 @@ void Game::handleReceivedData(const char* data, ssize_t dataSize) {
     if (dataJson.contains("type") && dataJson["type"] == "bullet") {
         // Add the bullet to the list
         std::cout << "Received bullet from server" << std::endl;
-        Bullet bullet(dataJson["position"][0], dataJson["position"][1], dataJson["velocity"][0], dataJson["velocity"][1]);
+        Bullet bullet(dataJson["position"][0], dataJson["position"][1], dataJson["velocity"][0], dataJson["velocity"][1], dataJson["owner"]);
         bullets.push_back(bullet);
     } 
     // Players
@@ -152,6 +162,7 @@ void Game::handleReceivedData(const char* data, ssize_t dataSize) {
         std::cout << "Received player id from server" << std::endl;
         player.setPlayerId(dataJson["id"]);
         player.setPlayerIdText();
+        player.setPlayerHealthText();
     }
 
     else if (dataJson.contains("type") && dataJson["type"] == "playerDisconnect") {
@@ -292,20 +303,34 @@ void Game::processEvents() {
 }
 
 void Game::update() {
+    player.checkIfDead();
+    //std::cout << "Im alive: " << player.getPlayerAlive() << std::endl;
+    if (player.getPlayerAlive() == 0) {
+        gameState = GameState::Dead;
+    }
     player.sendPlayerToServer(socket);
     receiveDataFromServer();
     // Update bullets
-    for (auto& bullet : bullets) {
-        bullet.move();
+    for (size_t i = 0; i < bullets.size(); ++i) {
+        bullets[i].move();
+        if (player.checkIfHitByBullet(bullets[i])) {
+            bullets[i] = bullets.back();
+            bullets.pop_back();
+            --i;  // Decrement the counter to recheck this index on the next iteration
+            continue;  // Skip the rest of the loop to avoid using a potentially invalidated bullet
+        }
 
         // Check for collisions with walls
         for (const auto& wall : walls) {
-            if (bullet.checkCollision(wall)) {
-                bullet = bullets.back();
+            if (bullets[i].checkCollision(wall)) {
+                bullets[i] = bullets.back();
                 bullets.pop_back();
+                --i;  // Decrement the counter to recheck this index on the next iteration
+                break;  // Exit the inner loop to avoid using a potentially invalidated bullet
             }
         }
     }
+
     // Remove bullets that are out of the screen
     bullets.erase(std::remove_if(bullets.begin(), bullets.end(), [](const Bullet& bullet) {
         return bullet.getShape().getPosition().x < 0 || bullet.getShape().getPosition().x > 800 ||
@@ -324,23 +349,45 @@ void Game::update() {
 void Game::render() {
     window.clear();
 
+    // Draw map
     window.draw(floor);
     for (const auto& wall : walls) {
         window.draw(wall.getShape());
     }
 
+    // Draw player
     window.draw(player.getShape());
     window.draw(player.getIdText());
+    window.draw(player.getHealthText());
 
     // Draw bullets
     for (const auto& bullet : bullets) {
         window.draw(bullet.getShape());
     }
-    // Draw players
+    // Draw other players
     for (auto& p : players) {
         window.draw(p.getShape());
         //window.draw(p.getIdText());
     }
 
     window.display();
+}
+
+void Game::processDeadState() {
+    player.setPosition(sf::Vector2f(1000, 1000));
+}
+
+void Game::respawnPlayer() {
+    sf::Event event;
+    while (window.pollEvent(event)) {
+        if (event.type == sf::Event::Closed)
+            window.close();
+    }
+
+    if (sf::Keyboard::isKeyPressed(sf::Keyboard::Space)) {
+        player.setPosition(sf::Vector2f(400, 300));
+        player.setPlayerHealth(100);
+        player.setPlayerAlive(1);
+        gameState = GameState::Playing;
+    }
 }

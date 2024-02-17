@@ -8,9 +8,10 @@
 
 class Bullet {
 public:
-    Bullet(float x, float y, float velocityX, float velocityY);
+    Bullet(float x, float y, float velocityX, float velocityY, int owner);
 
     void move();
+    int getOwner() const;
     const sf::CircleShape& getShape() const;
     bool checkCollision(const Wall& wall) const;
 
@@ -20,6 +21,7 @@ public:
 private:
     sf::CircleShape bulletShape;
     sf::Vector2f bulletVelocity;
+    int owner;
 };
 
 #endif // BULLET_H
