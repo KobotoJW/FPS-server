@@ -229,7 +229,7 @@ private:
             perror("Error receiving data from client");
             for (int client : clientSockets) {
                 if (client != clientSocket) {
-                    sendPlayerDisconnected(client);
+                    sendPlayerDisconnected(client, clientSocket);
                     break;
                 }
             }
@@ -240,8 +240,7 @@ private:
             std::cout << "Client disconnected: " << clientSocket << std::endl;
             for (int client : clientSockets) {
                 if (client != clientSocket) {
-                    sendPlayerDisconnected(client);
-                    break;
+                    sendPlayerDisconnected(client, clientSocket);
                 }
             }
             close(clientSocket);
@@ -323,23 +322,17 @@ private:
         //std::cout << "Returned pong to client" << std::endl;
     }
 
-    void sendPlayerDisconnected(int clientSocket) {
+    void sendPlayerDisconnected(int clientSocket, int clientSocketDisconnected) {
         nlohmann::json playerDisconnectedJson = {
             {"type", "playerDisconnected"},
-            {"id", clientSocket}
+            {"id", clientSocketDisconnected}
         };
         std::string playerDisconnectedJsonCap = playerDisconnectedJson.dump() + CAP_POST;
 
-        for (int client : clientSockets) {
-            if (client != clientSocket) {
-                try {
-                    send(client, playerDisconnectedJsonCap.c_str(), playerDisconnectedJsonCap.size(), MSG_NOSIGNAL);
-                } catch (std::exception& e) {
-                    std::cout << "Error sending player disconnected to client: " << e.what() << std::endl;
-                }
-            }
-        }
-        clientSockets.erase(std::remove(clientSockets.begin(), clientSockets.end(), clientSocket), clientSockets.end());
+        send(clientSocket, playerDisconnectedJsonCap.c_str(), playerDisconnectedJsonCap.size(), MSG_NOSIGNAL);
+
+        clientSockets.erase(std::remove(clientSockets.begin(), clientSockets.end(), clientSocketDisconnected), clientSockets.end());
+        std::cout << "Sent player disconnected to client: " << clientSocket << std::endl;
     }
 
     void removeClientSocket(int clientSocket) {

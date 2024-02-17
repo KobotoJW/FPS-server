@@ -154,7 +154,7 @@ void Game::handleReceivedData(const char* data, ssize_t dataSize) {
         players.back().setPlayerIdText();
         //std::cout << "New player created" << std::endl;
     } 
-    else if (dataJson.contains("type") && dataJson["type"] == "playerDisconnect") {
+    else if (dataJson.contains("type") && dataJson["type"] == "playerDisconnected") {
         std::cout << "Received player disconnect from server" << std::endl;
         int disconnectedId = dataJson["id"];
         for (auto it = players.begin(); it != players.end(); ++it) {
@@ -303,10 +303,20 @@ void Game::update() {
     for (size_t i = 0; i < bullets.size(); ++i) {
         bullets[i].move();
         if (player.checkIfHitByBullet(bullets[i])) {
+            player.decreasePlayerHealth(50);
             bullets[i] = bullets.back();
             bullets.pop_back();
-            --i;  // Decrement the counter to recheck this index on the next iteration
-            continue;  // Skip the rest of the loop to avoid using a potentially invalidated bullet
+            --i;
+            continue;
+        }
+
+        for (auto& p : players) {
+            if (p.checkIfHitByBullet(bullets[i])) {
+                bullets[i] = bullets.back();
+                bullets.pop_back();
+                --i;
+                break;
+            }
         }
 
         // Check for collisions with walls
@@ -314,8 +324,8 @@ void Game::update() {
             if (bullets[i].checkCollision(wall)) {
                 bullets[i] = bullets.back();
                 bullets.pop_back();
-                --i;  // Decrement the counter to recheck this index on the next iteration
-                break;  // Exit the inner loop to avoid using a potentially invalidated bullet
+                --i;
+                break;
             }
         }
     }

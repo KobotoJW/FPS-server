@@ -180,7 +180,6 @@ bool Player::getPlayerAlive() {
 
 bool Player::checkIfHitByBullet(const Bullet& bullet) {
     if (playerShape.getGlobalBounds().intersects(bullet.getShape().getGlobalBounds()) && bullet.getOwner() != playerId){
-        decreasePlayerHealth(50);
         std::cout << "Got hit by bullet from player: " << bullet.getOwner() << std::endl;
         return true;
     }
