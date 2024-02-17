@@ -42,6 +42,37 @@ void Player::getPlayerIdFromServer(sf::TcpSocket& socket) {
             std::cout << "Error sending json player data to server" << std::endl;
             return;
         }
+        size_t received = 0;
+        if (socket.receive(buffer, sizeof(buffer), received) != sf::Socket::Done) {
+            std::cout << "Error receiving json player data from server" << std::endl;
+            return;
+        }
+        std::vector<std::string> dataV;
+        std::string dataString = buffer;
+        size_t start = 0;
+        size_t end = 0;
+
+        //std::cout << "Received data from server pre decap: " << dataString << std::endl;
+
+        while ((end = dataString.find(CAP_POST, start)) != std::string::npos) {
+            std::string data = dataString.substr(start, end - start);
+            start = end + CAP_POST.size();
+            dataV.push_back(data);
+        }
+
+        for (std::string d : dataV) {
+            //std::cout << "Received data from server cap: " << d << std::endl;
+            nlohmann::json j = nlohmann::json::parse(d);
+            // Player Id
+            if (j.contains("type") && j["type"] == "playerId") {
+                std::cout << "Received player id from server" << std::endl;
+                setPlayerId(j["id"]);
+                setPlayerIdText();
+                setPlayerHealthText();
+            }
+        }
+        
+
     }
 }
 

@@ -23,6 +23,7 @@ void Game::run() {
                 socket.setBlocking(false);
                 player.setPlayerHealth(100);
                 player.setPlayerAlive(1);
+
                 gameState = GameState::Playing;
                 break;
             }
@@ -57,7 +58,7 @@ sf::TcpSocket& Game::getSocket() {
 
 bool Game::connectToServer() {
     //connect to server
-    sf::Socket::Status status = socket.connect("127.0.0.1", 5000);
+    sf::Socket::Status status = socket.connect("192.168.1.31", 5000);
     if (status != sf::Socket::Done) {
         std::cout << "Error connecting to server" << std::endl;
         return false;
@@ -104,13 +105,6 @@ void Game::receiveDataFromServer(){
 
 void Game::handleReceivedData(const char* data, ssize_t dataSize) {
     // Handle the received data from the server
-
-    if (dataSize == 4 && strncmp(data, "pong", 4) == 0) {
-        //std::cout << "Received ping from server" << std::endl;
-        recievedPongFromServer();
-        return;
-    }
-
     //std::cout << "Received data from server: " << data << std::endl;
     nlohmann::json dataJson;
     try
@@ -128,7 +122,10 @@ void Game::handleReceivedData(const char* data, ssize_t dataSize) {
     //std::cout << "Received data from server (JSON): " << dataJson << std::endl;
 
     // Bullets
-    if (dataJson.contains("type") && dataJson["type"] == "bullet") {
+    if (dataJson.contains("type") && dataJson["type"] == "pong") {
+        recievedPongFromServer();
+    }
+    else if (dataJson.contains("type") && dataJson["type"] == "bullet") {
         // Add the bullet to the list
         std::cout << "Received bullet from server" << std::endl;
         Bullet bullet(dataJson["position"][0], dataJson["position"][1], dataJson["velocity"][0], dataJson["velocity"][1], dataJson["owner"]);
@@ -157,14 +154,6 @@ void Game::handleReceivedData(const char* data, ssize_t dataSize) {
         players.back().setPlayerIdText();
         //std::cout << "New player created" << std::endl;
     } 
-    // Player Id
-    else if (dataJson.contains("type") && dataJson["type"] == "playerId") {
-        std::cout << "Received player id from server" << std::endl;
-        player.setPlayerId(dataJson["id"]);
-        player.setPlayerIdText();
-        player.setPlayerHealthText();
-    }
-
     else if (dataJson.contains("type") && dataJson["type"] == "playerDisconnect") {
         std::cout << "Received player disconnect from server" << std::endl;
         int disconnectedId = dataJson["id"];

@@ -230,6 +230,7 @@ private:
             for (int client : clientSockets) {
                 if (client != clientSocket) {
                     sendPlayerDisconnected(client);
+                    break;
                 }
             }
             removeClientSocket(clientSocket);
@@ -240,6 +241,7 @@ private:
             for (int client : clientSockets) {
                 if (client != clientSocket) {
                     sendPlayerDisconnected(client);
+                    break;
                 }
             }
             close(clientSocket);
@@ -313,8 +315,11 @@ private:
     }
 
     void returnPong(int clientSocket) {
-        std::string pongMsg = "pong" + CAP_POST;
-        send(clientSocket, pongMsg.c_str(), pongMsg.size(), 0);
+        nlohmann::json pongJson = {
+            {"type", "pong"}
+        };
+        std::string pongJsonCap = pongJson.dump() + CAP_POST;
+        send(clientSocket, pongJsonCap.c_str(), pongJsonCap.size(), 0);
         //std::cout << "Returned pong to client" << std::endl;
     }
 
@@ -325,19 +330,16 @@ private:
         };
         std::string playerDisconnectedJsonCap = playerDisconnectedJson.dump() + CAP_POST;
 
-        auto it = clientSockets.begin();
-        while (it != clientSockets.end()) {
-            if (*it != clientSocket) {
-                if (send(*it, playerDisconnectedJsonCap.c_str(), playerDisconnectedJsonCap.size(), 0) == -1) {
-                    perror("Error sending player disconnected message to client");
-                    it = clientSockets.erase(it);  // Remove the client from the list
-                } else {
-                    ++it;
+        for (int client : clientSockets) {
+            if (client != clientSocket) {
+                try {
+                    send(client, playerDisconnectedJsonCap.c_str(), playerDisconnectedJsonCap.size(), MSG_NOSIGNAL);
+                } catch (std::exception& e) {
+                    std::cout << "Error sending player disconnected to client: " << e.what() << std::endl;
                 }
-            } else {
-                ++it;
             }
         }
+        clientSockets.erase(std::remove(clientSockets.begin(), clientSockets.end(), clientSocket), clientSockets.end());
     }
 
     void removeClientSocket(int clientSocket) {
