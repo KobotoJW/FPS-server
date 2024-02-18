@@ -27,6 +27,11 @@ void Game::run() {
                 gameState = GameState::Playing;
                 break;
             }
+            else {
+                std::cout << "Error connecting to server" << std::endl;
+                gameState = GameState::Disconnecting;
+                break;
+            }
 
         case GameState::Playing:
             processEvents();
@@ -98,12 +103,12 @@ void Game::receiveDataFromServer(){
 
         for (std::string d : dataV) {
             //std::cout << "Received data from server cap: " << d << std::endl;
-            handleReceivedData(d.c_str(), d.size());
+            handleReceivedData(d.c_str());
         }
     }
 }
 
-void Game::handleReceivedData(const char* data, ssize_t dataSize) {
+void Game::handleReceivedData(const char* data) {
     // Handle the received data from the server
     //std::cout << "Received data from server: " << data << std::endl;
     nlohmann::json dataJson;
@@ -225,7 +230,7 @@ void Game::recieveMapFromServer(){
         floor.setPosition(mapJson["floor"]["position"]["x"], mapJson["floor"]["position"]["y"]);
         floor.setSize(sf::Vector2f(mapJson["floor"]["dimensions"]["width"], mapJson["floor"]["dimensions"]["height"]));
 
-        for (int i = 0; i < mapJson["walls"].size(); i++){
+        for (int i = 0; i < int(mapJson["walls"].size()); i++){
             if (!mapJson["walls"][i].is_object() || !mapJson["walls"][i]["position"].is_object() || !mapJson["walls"][i]["dimensions"].is_object() || !mapJson["walls"][i]["color"].is_object()) {
                 std::cout << "Invalid JSON structure in walls array" << std::endl;
                 //std::cout << mapJson["walls"][i] << std::endl;

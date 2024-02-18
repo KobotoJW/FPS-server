@@ -15,3 +15,6 @@ add_executable(${PROJECT_NAME}-client ${CLIENT_SOURCES})
 
 target_link_libraries(${PROJECT_NAME}-client PRIVATE nlohmann_json::nlohmann_json)
 target_link_libraries(${PROJECT_NAME}-client PRIVATE sfml-graphics sfml-network nlohmann_json::nlohmann_json)
+
+set_target_properties(${PROJECT_NAME}-client PROPERTIES COMPILE_FLAGS "-Wall -Wextra")
+set_target_properties(${PROJECT_NAME}-server PROPERTIES COMPILE_FLAGS "-Wall -Wextra")
