@@ -17,9 +17,9 @@ enum class GameState {
 class Game {
 public:
     Game();
-    void run();
+    void run(std::string serverIP);
     sf::TcpSocket& getSocket();
-    bool connectToServer();
+    bool connectToServer(std::string gameID);
     void receiveDataFromServer();
     void handleReceivedData(const char* data);
     void pingServer();

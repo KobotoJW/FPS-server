@@ -8,12 +8,12 @@ Game::Game() : window(sf::VideoMode(800, 600), "2D Client") {
     gameState = GameState::Joining;
 }
 
-void Game::run() {
+void Game::run(std::string gameID) {
     while (window.isOpen()) {
 
         switch (gameState) {
         case GameState::Joining:
-            if (connectToServer()) {
+            if (connectToServer(gameID)) {
                 std::cout << "Connected to server (joining)" << std::endl;
                 recieveMapFromServer();
                 std::cout << "Received map from server" << std::endl;
@@ -61,9 +61,9 @@ sf::TcpSocket& Game::getSocket() {
     return socket;
 }
 
-bool Game::connectToServer() {
+bool Game::connectToServer(std::string gameID) {
     //connect to server
-    sf::Socket::Status status = socket.connect("127.0.0.1", 5000);
+    sf::Socket::Status status = socket.connect(gameID, 5000);
     if (status != sf::Socket::Done) {
         std::cout << "Error connecting to server" << std::endl;
         return false;

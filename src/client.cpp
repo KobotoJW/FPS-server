@@ -8,9 +8,14 @@
 #include "Player.h"
 #include "Game.h"
 
-int main() {
+int main(int argc, char** argv) {
+    if (argc != 2) {
+        std::cout << "Usage: " << argv[0] << " <server-ip>" << std::endl;
+        return 1;
+    }
+
     Game game;
-    game.run();
+    game.run(argv[1]);
 
     return 0;
 }
