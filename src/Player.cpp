@@ -85,7 +85,7 @@ const sf::RectangleShape& Player::getShape() const {
 }
 
 void Player::setPlayerHealthText() {
-    font.loadFromFile("Arial.ttf");
+    font.loadFromFile("../resources/Arial.ttf");
     healthText.setFont(font);
     healthText.setCharacterSize(32);
     healthText.setFillColor(sf::Color::Black);
@@ -99,7 +99,7 @@ sf::Text& Player::getHealthText() {
 }
 
 void Player::setPlayerIdText() {
-    font.loadFromFile("Arial.ttf");
+    font.loadFromFile("../resources/Arial.ttf");
     idText.setFont(font);
     idText.setCharacterSize(24);
     idText.setFillColor(sf::Color::Black);
