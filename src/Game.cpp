@@ -58,7 +58,7 @@ sf::TcpSocket& Game::getSocket() {
 
 bool Game::connectToServer() {
     //connect to server
-    sf::Socket::Status status = socket.connect("192.168.1.31", 5000);
+    sf::Socket::Status status = socket.connect("127.0.0.1", 5000);
     if (status != sf::Socket::Done) {
         std::cout << "Error connecting to server" << std::endl;
         return false;
