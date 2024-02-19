@@ -3,7 +3,7 @@
 
 const std::string CAP_POST = "5t0p";
 
-Player::Player() : playerShape(sf::Vector2f(50, 50)), playerVelocity(5.0f), playerId(0) {
+Player::Player() : playerShape(sf::Vector2f(50, 50)), playerVelocity(5.0f), playerId(0), playerHealth(100), playerAlive(true){
     playerShape.setFillColor(sf::Color::Green);
     playerShape.setPosition(400, 300);
 }
